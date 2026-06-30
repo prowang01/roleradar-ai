@@ -34,6 +34,7 @@ const debugInfo = {
 let elBadge, elWarning, elExtractMsg, elStatusMsg, elDebugRows;
 let elTitle, elCompany, elLocation, elDesc;
 let btnRefresh, btnSave, btnApplied, btnAnalyze, btnDebugExtract;
+let btnCopyDom, elDomDebugStatus, elDomDebugOut;
 
 document.addEventListener('DOMContentLoaded', async () => {
   elBadge         = document.getElementById('badge');
@@ -50,12 +51,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnApplied      = document.getElementById('btn-applied');
   btnAnalyze      = document.getElementById('btn-analyze');
   btnDebugExtract = document.getElementById('btn-debug-extract');
+  btnCopyDom      = document.getElementById('btn-copy-dom');
+  elDomDebugStatus = document.getElementById('dom-debug-status');
+  elDomDebugOut    = document.getElementById('dom-debug-out');
 
   btnRefresh.addEventListener('click', onRefresh);
   btnSave.addEventListener('click', onSave);
   btnApplied.addEventListener('click', onApplied);
   btnAnalyze.addEventListener('click', onAnalyze);
   btnDebugExtract.addEventListener('click', onDebugExtract);
+  btnCopyDom.addEventListener('click', onCopyDom);
 
   renderDebugPanel(); // show initial —/— state
   await init();
@@ -207,7 +212,7 @@ async function extractFromTab() {
 
   const allEmpty = !data.title && !data.company && !data.location && !data.description;
   if (allEmpty) {
-    debugInfo.lastError = 'Extraction succeeded but returned empty fields.';
+    debugInfo.lastError = 'Content script works, but LinkedIn DOM selectors found no job data.';
   }
   renderDebugPanel();
 
@@ -219,7 +224,7 @@ async function extractFromTab() {
   if (data.description) elDesc.value        = data.description;
 
   if (allEmpty) {
-    setExtractMsg('warning', 'Extraction succeeded but returned empty fields.');
+    setExtractMsg('warning', 'Content script works, but no job data found. Click "Copy DOM" to debug.');
     return;
   }
 
@@ -251,6 +256,54 @@ async function onDebugExtract() {
   btnDebugExtract.disabled = true;
   await extractFromTab();
   btnDebugExtract.disabled = false;
+}
+
+// ── Copy DOM Debug ────────────────────────────────────────────────────────────
+// Sends dom_debug to the content script and puts the JSON payload in the
+// textarea so the user can inspect or copy it for selector debugging.
+
+async function onCopyDom() {
+  if (!state.tabId) {
+    elDomDebugStatus.textContent = 'No tab';
+    return;
+  }
+  console.log('[RoleRadar] Copy DOM Debug clicked');
+  btnCopyDom.disabled = true;
+  elDomDebugStatus.textContent = 'Collecting…';
+  elDomDebugOut.value = '';
+
+  try {
+    const resp = await chrome.tabs.sendMessage(state.tabId, { action: 'dom_debug' });
+    if (!resp) {
+      elDomDebugStatus.textContent = 'No response';
+      elDomDebugOut.value = 'Content script returned nothing.';
+      return;
+    }
+    if (!resp.ok) {
+      elDomDebugStatus.textContent = 'Error';
+      elDomDebugOut.value = 'Error from content script: ' + (resp.error || 'unknown');
+      return;
+    }
+
+    const json = JSON.stringify(resp.payload, null, 2);
+    elDomDebugOut.value = json;
+    elDomDebugOut.select(); // select for easy manual copy
+
+    // Attempt clipboard write (works during user-gesture in popup context)
+    try {
+      await navigator.clipboard.writeText(json);
+      elDomDebugStatus.textContent = 'Copied to clipboard ✓';
+    } catch {
+      elDomDebugStatus.textContent = 'Select all + copy manually';
+    }
+    console.log('[RoleRadar] DOM debug payload length:', json.length);
+  } catch (err) {
+    console.error('[RoleRadar] dom_debug message failed:', err.message);
+    elDomDebugStatus.textContent = 'Failed';
+    elDomDebugOut.value = 'sendMessage error: ' + err.message;
+  } finally {
+    btnCopyDom.disabled = false;
+  }
 }
 
 // ── Backend communication ─────────────────────────────────────────────────────

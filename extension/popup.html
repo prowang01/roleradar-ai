@@ -138,14 +138,36 @@
       font-size: 10px; font-weight: 700;
       color: #475569; text-transform: uppercase; letter-spacing: 0.1em;
     }
-    #btn-debug-extract {
+    .debug-header-btns { display: flex; gap: 5px; }
+    .debug-header-btns button {
       font-size: 10px; font-family: inherit;
       padding: 3px 9px; background: #1e293b;
       border: 1px solid #334155; border-radius: 3px;
       color: #94a3b8; cursor: pointer;
     }
-    #btn-debug-extract:hover    { background: #334155; color: #e2e8f0; }
-    #btn-debug-extract:disabled { opacity: 0.4; cursor: not-allowed; }
+    .debug-header-btns button:hover    { background: #334155; color: #e2e8f0; }
+    .debug-header-btns button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── DOM Recon section ── */
+    .dom-debug-section { background: #070d18; border-top: 1px solid #1e293b; }
+    .dom-debug-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 12px;
+    }
+    .dom-debug-title {
+      font-size: 10px; font-weight: 700;
+      color: #334155; text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    #dom-debug-status { font-size: 10px; font-family: monospace; color: #4ade80; }
+    #dom-debug-out {
+      display: block; width: 100%; height: 150px;
+      background: #070d18; color: #64748b;
+      font-family: 'Menlo', 'Consolas', monospace;
+      font-size: 9px; line-height: 1.45;
+      border: none; border-top: 1px solid #1e293b;
+      padding: 8px 12px; resize: none; box-sizing: border-box;
+    }
+    #dom-debug-out:focus { outline: none; }
 
     #debug-rows {
       padding: 8px 12px 12px;
@@ -212,9 +234,21 @@
   <div class="debug-panel">
     <div class="debug-header">
       <span class="debug-title">Debug</span>
-      <button id="btn-debug-extract">Debug Extract</button>
+      <div class="debug-header-btns">
+        <button id="btn-debug-extract">Debug Extract</button>
+        <button id="btn-copy-dom">Copy DOM</button>
+      </div>
     </div>
     <div id="debug-rows"></div>
+  </div>
+
+  <div class="dom-debug-section">
+    <div class="dom-debug-header">
+      <span class="dom-debug-title">DOM Recon</span>
+      <span id="dom-debug-status"></span>
+    </div>
+    <textarea id="dom-debug-out" readonly
+      placeholder="Click 'Copy DOM' to capture the page structure for debugging…"></textarea>
   </div>
 
   <script src="popup.js"></script>
