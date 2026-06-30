@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.models import Job, JobStatus
-from backend.schemas import JobCreate, JobUpdate, JobResponse, JobDetailResponse, FitAnalysisResponse
+from backend.schemas import JobCreate, JobUpdate, JobResponse, JobDetailResponse, FitAnalysisResponse, JobLookupResponse
 from backend.services.dedup import find_duplicate
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -51,20 +51,20 @@ def list_jobs(
     return q.order_by(Job.created_at.desc()).all()
 
 
-@router.get("/lookup", response_model=JobDetailResponse)
+@router.get("/lookup", response_model=JobLookupResponse)
 def lookup_job(url: str = Query(..., description="Exact job URL"), db: Session = Depends(get_db)):
     job = db.query(Job).filter(Job.url == url.strip()).first()
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        return JobLookupResponse(found=False)
 
     latest = None
     if job.analyses:
         latest = max(job.analyses, key=lambda a: a.created_at)
 
-    result = JobDetailResponse.model_validate(job)
+    job_response = JobDetailResponse.model_validate(job)
     if latest:
-        result.latest_analysis = FitAnalysisResponse.model_validate(latest)
-    return result
+        job_response.latest_analysis = FitAnalysisResponse.model_validate(latest)
+    return JobLookupResponse(found=True, job=job_response)
 
 
 @router.get("/{job_id}", response_model=JobDetailResponse)

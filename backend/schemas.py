@@ -87,6 +87,11 @@ class JobDetailResponse(JobResponse):
     latest_analysis: Optional[FitAnalysisResponse] = None
 
 
+class JobLookupResponse(BaseModel):
+    found: bool
+    job: Optional[JobDetailResponse] = None
+
+
 class UserProfileUpdate(BaseModel):
     target_roles: Optional[List[str]] = None
     target_contract: Optional[str] = None

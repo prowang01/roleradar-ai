@@ -1,5 +1,5 @@
-// content.js — runs on linkedin.com/jobs/view/* and /jobs/search-results/*
-// Extracts job fields on demand when the popup sends an "extract" message.
+// content.js — injected into linkedin.com/jobs/view/* and /jobs/search-results/*
+// Reads the current DOM on demand (no caching). Safe to call multiple times.
 
 const TITLE_SELECTORS = [
   '.job-details-jobs-unified-top-card__job-title h1',
@@ -39,6 +39,7 @@ const DESC_SELECTORS = [
   '.jobs-description',
 ];
 
+// Selectors for the "Show more" / "Tout afficher" expand button
 const SHOW_MORE_SELECTORS = [
   '.jobs-description__footer-button',
   'button.jobs-description__footer-button',
@@ -55,8 +56,8 @@ function tryText(selectors) {
         const text = (el.innerText || el.textContent || '').trim();
         if (text) return text;
       }
-    } catch {
-      // invalid selector — skip
+    } catch (e) {
+      console.warn('[RoleRadar:content] Bad selector:', sel, e.message);
     }
   }
   return null;
@@ -69,7 +70,7 @@ function extractJobId(url) {
     if (fromParam && /^\d+$/.test(fromParam)) return fromParam;
   } catch {}
 
-  // 2. /jobs/view/{id} path
+  // 2. /jobs/view/{id} path segment
   const match = url.match(/\/jobs\/view\/(\d+)/);
   if (match) return match[1];
 
@@ -80,23 +81,55 @@ function isTruncated() {
   for (const sel of SHOW_MORE_SELECTORS) {
     try {
       const btn = document.querySelector(sel);
-      // offsetParent is null when the element is hidden via display:none
-      if (btn && btn.offsetParent !== null) return true;
-    } catch {}
+      if (btn) {
+        // Use getComputedStyle — more reliable than offsetParent for visibility
+        const style = window.getComputedStyle(btn);
+        const visible =
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          btn.offsetHeight > 0;
+        if (visible) {
+          console.log(
+            '[RoleRadar:content] Truncation button visible:',
+            sel,
+            btn.innerText.trim().slice(0, 40)
+          );
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('[RoleRadar:content] Truncation selector error:', sel, e.message);
+    }
   }
   return false;
 }
 
+// Respond to extract requests from the popup.
+// Every call reads the current DOM at that moment — no caching.
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.action !== 'extract') return;
 
   const url = window.location.href;
-  sendResponse({
-    jobId: extractJobId(url),
-    title: tryText(TITLE_SELECTORS),
-    company: tryText(COMPANY_SELECTORS),
-    location: tryText(LOCATION_SELECTORS),
+  console.log('[RoleRadar:content] Extract request received, URL:', url);
+
+  const result = {
+    jobId:       extractJobId(url),
+    title:       tryText(TITLE_SELECTORS),
+    company:     tryText(COMPANY_SELECTORS),
+    location:    tryText(LOCATION_SELECTORS),
     description: tryText(DESC_SELECTORS),
-    truncated: isTruncated(),
+    truncated:   isTruncated(),
+  };
+
+  console.log('[RoleRadar:content] Extract result:', {
+    jobId:             result.jobId,
+    title:             result.title?.slice(0, 50),
+    company:           result.company,
+    locationLength:    result.location?.length ?? 0,
+    descriptionLength: result.description?.length ?? 0,
+    truncated:         result.truncated,
   });
+
+  sendResponse(result);
+  return true; // Keep message channel open
 });
