@@ -1,5 +1,10 @@
-// content.js — injected into linkedin.com/jobs/view/* and /jobs/search-results/*
+// content.js — injected into linkedin.com/jobs/*
 // Reads the current DOM on demand (no caching). Safe to call multiple times.
+//
+// Double-injection guard: the popup may inject this file programmatically
+// (fallback) even when the manifest already injected it declaratively.
+// All side-effectful code (the message listener) is wrapped in the guard so
+// only one listener is ever registered per tab, regardless of injection count.
 
 const TITLE_SELECTORS = [
   '.job-details-jobs-unified-top-card__job-title h1',
@@ -104,32 +109,41 @@ function isTruncated() {
   return false;
 }
 
-// Respond to extract requests from the popup.
-// Every call reads the current DOM at that moment — no caching.
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.action !== 'extract') return;
+// Register listener only once per tab (declarative injection + programmatic
+// fallback both run this file; window is the shared page context).
+if (!window.__roleradarInjected) {
+  window.__roleradarInjected = true;
+  console.log('[RoleRadar:content] Listener registered on', window.location.href);
 
-  const url = window.location.href;
-  console.log('[RoleRadar:content] Extract request received, URL:', url);
+  // Respond to extract requests from the popup.
+  // Every call reads the current DOM at that moment — no caching.
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg.action !== 'extract') return;
 
-  const result = {
-    jobId:       extractJobId(url),
-    title:       tryText(TITLE_SELECTORS),
-    company:     tryText(COMPANY_SELECTORS),
-    location:    tryText(LOCATION_SELECTORS),
-    description: tryText(DESC_SELECTORS),
-    truncated:   isTruncated(),
-  };
+    const url = window.location.href;
+    console.log('[RoleRadar:content] Extract request received, URL:', url);
 
-  console.log('[RoleRadar:content] Extract result:', {
-    jobId:             result.jobId,
-    title:             result.title?.slice(0, 50),
-    company:           result.company,
-    locationLength:    result.location?.length ?? 0,
-    descriptionLength: result.description?.length ?? 0,
-    truncated:         result.truncated,
+    const result = {
+      jobId:       extractJobId(url),
+      title:       tryText(TITLE_SELECTORS),
+      company:     tryText(COMPANY_SELECTORS),
+      location:    tryText(LOCATION_SELECTORS),
+      description: tryText(DESC_SELECTORS),
+      truncated:   isTruncated(),
+    };
+
+    console.log('[RoleRadar:content] Extract result:', {
+      jobId:             result.jobId,
+      title:             result.title?.slice(0, 50),
+      company:           result.company,
+      locationLength:    result.location?.length ?? 0,
+      descriptionLength: result.description?.length ?? 0,
+      truncated:         result.truncated,
+    });
+
+    sendResponse(result);
+    return true; // Keep message channel open
   });
-
-  sendResponse(result);
-  return true; // Keep message channel open
-});
+} else {
+  console.log('[RoleRadar:content] Already injected — skipping listener re-registration');
+}

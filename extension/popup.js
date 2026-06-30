@@ -72,10 +72,7 @@ async function init() {
 
 function isJobPage(url) {
   if (!url) return false;
-  return (
-    url.includes('linkedin.com/jobs/view/') ||
-    url.includes('linkedin.com/jobs/search-results/')
-  );
+  return url.includes('linkedin.com/jobs/');
 }
 
 // ── Extraction ───────────────────────────────────────────────────────────────
@@ -86,28 +83,49 @@ async function extractFromTab() {
   setExtractMsg('loading', 'Extracting job…');
   clearWarning();
 
-  console.log('[RoleRadar] Sending extract message to tab', state.tabId);
+  console.log('[RoleRadar] Sending extract message to tab', state.tabId, 'URL:', state.url);
 
   let data;
+  let usedInjection = false;
+
+  // ── First attempt ──────────────────────────────────────────────────────────
   try {
     data = await chrome.tabs.sendMessage(state.tabId, { action: 'extract' });
-  } catch (err) {
-    console.error('[RoleRadar] sendMessage failed:', err.message);
+    console.log('[RoleRadar] Content script was already available (declarative injection)');
+  } catch (firstErr) {
+    const isNoReceiver =
+      firstErr.message?.includes('Could not establish connection') ||
+      firstErr.message?.includes('Receiving end does not exist');
 
-    const noConnection =
-      err.message?.includes('Could not establish connection') ||
-      err.message?.includes('Receiving end does not exist');
-
-    if (noConnection) {
-      showWarning('Content script not available — reload the LinkedIn tab, then reopen this popup.');
-      setExtractMsg('error', 'Could not extract job — reload the LinkedIn tab.');
-    } else {
-      setExtractMsg('error', 'Could not extract job — ' + err.message);
+    if (!isNoReceiver) {
+      console.error('[RoleRadar] sendMessage failed (unexpected):', firstErr.message);
+      setExtractMsg('error', 'Could not extract job — ' + firstErr.message);
+      return;
     }
-    return;
+
+    // ── Programmatic injection fallback ────────────────────────────────────
+    // Tab was open before the extension was installed/updated, or the URL was
+    // not covered by the old manifest. Inject content.js now and retry.
+    console.log('[RoleRadar] Content script not found — injecting programmatically');
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: state.tabId },
+        files: ['content.js'],
+      });
+      usedInjection = true;
+      console.log('[RoleRadar] Injection successful — retrying sendMessage');
+      data = await chrome.tabs.sendMessage(state.tabId, { action: 'extract' });
+    } catch (injectErr) {
+      console.error('[RoleRadar] Injection failed:', injectErr.message);
+      showWarning('Could not access this LinkedIn job page. Reload the tab and try again.');
+      setExtractMsg('error', 'Could not extract job — reload the tab and try again.');
+      return;
+    }
   }
 
-  console.log('[RoleRadar] Extract response received:', {
+  // ── Handle response ────────────────────────────────────────────────────────
+  const suffix = usedInjection ? ' (after injection)' : '';
+  console.log('[RoleRadar] Extract response received' + suffix + ':', {
     jobId:             data?.jobId,
     title:             data?.title?.slice(0, 50),
     company:           data?.company,
@@ -121,8 +139,7 @@ async function extractFromTab() {
     return;
   }
 
-  // Update state and form fields. Only overwrite a field if extraction found
-  // something — preserves any manual corrections the user made.
+  // Only overwrite a field when extraction found something — preserves manual edits.
   if (data.jobId)       state.externalJobId  = data.jobId;
   if (data.title)       elTitle.value        = data.title;
   if (data.company)     elCompany.value      = data.company;
