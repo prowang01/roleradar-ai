@@ -89,11 +89,9 @@ const DESC_END_MARKERS = [
   "Essayer Premium",
   "En savoir plus sur l’entreprise",
   "En savoir plus sur l’entreprise",
-  // French — benefits block
+  // French — LinkedIn-generated benefits block (not author-written Benefits sections)
   "Avantages trouvés dans l'offre d'emploi",
   "Avantages trouvés dans l'offre d'emploi",
-  "Avantages de l'emploi",
-  "Avantages de l'emploi",
   // English
   "Faster job searches",
   "See how you compare",
@@ -103,8 +101,6 @@ const DESC_END_MARKERS = [
   "More jobs",
   "Try Premium",
   "Learn more about the company",
-  "Job benefits",
-  "Benefits",
 ];
 
 // Standalone UI fragments to strip from extracted description text.
@@ -344,13 +340,23 @@ function cleanDescription(raw) {
   return text;
 }
 
+// Escape special regex characters in a literal string.
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Cut text at the first end marker that appears as a standalone line.
+// Substring matches mid-sentence are ignored — the marker must occupy its own line.
 function sliceByEndMarkers(text) {
   let endIdx = text.length;
   let foundEnd = null;
   for (const marker of DESC_END_MARKERS) {
-    const idx = text.indexOf(marker);
-    if (idx >= 0 && idx < endIdx) {
-      endIdx = idx;
+    // Match the marker only when it is the entire content of a line
+    // (optional surrounding whitespace/tabs allowed, but nothing else on that line).
+    const re = new RegExp('(?:^|\\n)[ \\t]*' + escapeRegex(marker) + '[ \\t]*(?=\\n|$)', 'i');
+    const m = re.exec(text);
+    if (m && m.index < endIdx) {
+      endIdx = m.index;
       foundEnd = marker;
     }
   }
