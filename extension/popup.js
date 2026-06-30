@@ -3,41 +3,65 @@
 
 const API = 'http://localhost:8000';
 
+// ── Runtime state ────────────────────────────────────────────────────────────
+
 const state = {
   tabId:         null,
   url:           null,
   externalJobId: null,
-  backendJob:    null,  // JobDetailResponse or null
+  backendJob:    null,
 };
 
-// DOM refs
-let elBadge, elWarning, elExtractMsg, elStatusMsg;
+// Debug info object — updated at every key step and rendered to the panel.
+const debugInfo = {
+  activeTabUrl:           null,
+  isJobPage:              null,
+  contentScriptAvailable: null,
+  injectionAttempted:     false,
+  injectionSucceeded:     null,
+  extractSucceeded:       null,
+  jobId:                  null,
+  title:                  null,
+  company:                null,
+  location:               null,
+  descriptionLength:      null,
+  isTruncated:            null,
+  lastError:              null,
+};
+
+// ── DOM refs ─────────────────────────────────────────────────────────────────
+
+let elBadge, elWarning, elExtractMsg, elStatusMsg, elDebugRows;
 let elTitle, elCompany, elLocation, elDesc;
-let btnRefresh, btnSave, btnApplied, btnAnalyze;
+let btnRefresh, btnSave, btnApplied, btnAnalyze, btnDebugExtract;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  elBadge      = document.getElementById('badge');
-  elWarning    = document.getElementById('warning');
-  elExtractMsg = document.getElementById('extract-msg');
-  elStatusMsg  = document.getElementById('status-msg');
-  elTitle      = document.getElementById('f-title');
-  elCompany    = document.getElementById('f-company');
-  elLocation   = document.getElementById('f-location');
-  elDesc       = document.getElementById('f-desc');
-  btnRefresh   = document.getElementById('btn-refresh');
-  btnSave      = document.getElementById('btn-save');
-  btnApplied   = document.getElementById('btn-applied');
-  btnAnalyze   = document.getElementById('btn-analyze');
+  elBadge         = document.getElementById('badge');
+  elWarning       = document.getElementById('warning');
+  elExtractMsg    = document.getElementById('extract-msg');
+  elStatusMsg     = document.getElementById('status-msg');
+  elDebugRows     = document.getElementById('debug-rows');
+  elTitle         = document.getElementById('f-title');
+  elCompany       = document.getElementById('f-company');
+  elLocation      = document.getElementById('f-location');
+  elDesc          = document.getElementById('f-desc');
+  btnRefresh      = document.getElementById('btn-refresh');
+  btnSave         = document.getElementById('btn-save');
+  btnApplied      = document.getElementById('btn-applied');
+  btnAnalyze      = document.getElementById('btn-analyze');
+  btnDebugExtract = document.getElementById('btn-debug-extract');
 
   btnRefresh.addEventListener('click', onRefresh);
   btnSave.addEventListener('click', onSave);
   btnApplied.addEventListener('click', onApplied);
   btnAnalyze.addEventListener('click', onAnalyze);
+  btnDebugExtract.addEventListener('click', onDebugExtract);
 
+  renderDebugPanel(); // show initial —/— state
   await init();
 });
 
-// ── Initialization ───────────────────────────────────────────────────────────
+// ── Initialization ────────────────────────────────────────────────────────────
 
 async function init() {
   console.log('[RoleRadar] Popup opened');
@@ -45,6 +69,8 @@ async function init() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const tab = tabs[0];
   if (!tab) {
+    debugInfo.lastError = 'No active tab found';
+    renderDebugPanel();
     setExtractMsg('error', 'No active tab found.');
     setActionButtons(false);
     return;
@@ -52,20 +78,23 @@ async function init() {
 
   state.tabId = tab.id;
   state.url   = tab.url;
-  console.log('[RoleRadar] Active tab:', { id: tab.id, url: tab.url });
+  debugInfo.activeTabUrl = tab.url;
+  debugInfo.isJobPage    = isJobPage(tab.url);
+  renderDebugPanel();
 
-  if (!isJobPage(state.url)) {
+  console.log('[RoleRadar] Active tab:', { id: tab.id, url: tab.url });
+  console.log('[RoleRadar] isJobPage:', debugInfo.isJobPage);
+
+  if (!debugInfo.isJobPage) {
     setBadge('—', '');
     setExtractMsg('error', 'Open a LinkedIn job listing to use RoleRadar.');
     setActionButtons(false);
-    btnRefresh.disabled = true;
+    btnRefresh.disabled      = true;
+    btnDebugExtract.disabled = true;
     return;
   }
 
-  // Always extract fresh from the current DOM on every popup open.
   await extractFromTab();
-
-  // Check if job is already in the backend.
   await lookupBackend();
   refreshBadge();
 }
@@ -75,57 +104,83 @@ function isJobPage(url) {
   return url.includes('linkedin.com/jobs/');
 }
 
-// ── Extraction ───────────────────────────────────────────────────────────────
-// Called on popup open AND when the user clicks ↺ Refresh.
-// Always sends a live message to the content script — no caching.
+// ── Extraction ────────────────────────────────────────────────────────────────
+// Always reads the live DOM — no caching. Called on popup open, ↺ Refresh, and
+// Debug Extract. Updates debugInfo at every intermediate step.
 
 async function extractFromTab() {
   setExtractMsg('loading', 'Extracting job…');
   clearWarning();
+
+  // Reset extraction fields so stale values aren't shown during the new run.
+  debugInfo.contentScriptAvailable = null;
+  debugInfo.injectionAttempted     = false;
+  debugInfo.injectionSucceeded     = null;
+  debugInfo.extractSucceeded       = null;
+  debugInfo.lastError              = null;
+  renderDebugPanel();
 
   console.log('[RoleRadar] Sending extract message to tab', state.tabId, 'URL:', state.url);
 
   let data;
   let usedInjection = false;
 
-  // ── First attempt ──────────────────────────────────────────────────────────
+  // ── Attempt 1: send message to existing content script ──────────────────
   try {
     data = await chrome.tabs.sendMessage(state.tabId, { action: 'extract' });
+    debugInfo.contentScriptAvailable = true;
+    renderDebugPanel();
     console.log('[RoleRadar] Content script was already available (declarative injection)');
   } catch (firstErr) {
+    debugInfo.contentScriptAvailable = false;
+    debugInfo.lastError = firstErr.message;
+    renderDebugPanel();
+    console.warn('[RoleRadar] sendMessage failed:', firstErr.message);
+
     const isNoReceiver =
       firstErr.message?.includes('Could not establish connection') ||
       firstErr.message?.includes('Receiving end does not exist');
 
     if (!isNoReceiver) {
-      console.error('[RoleRadar] sendMessage failed (unexpected):', firstErr.message);
-      setExtractMsg('error', 'Could not extract job — ' + firstErr.message);
+      // Unexpected error — not a missing-script problem.
+      debugInfo.extractSucceeded = false;
+      renderDebugPanel();
+      setExtractMsg('error', 'sendMessage error: ' + firstErr.message);
       return;
     }
 
-    // ── Programmatic injection fallback ────────────────────────────────────
-    // Tab was open before the extension was installed/updated, or the URL was
-    // not covered by the old manifest. Inject content.js now and retry.
+    // ── Attempt 2: inject content.js, then retry ─────────────────────────
+    debugInfo.injectionAttempted = true;
+    renderDebugPanel();
     console.log('[RoleRadar] Content script not found — injecting programmatically');
+
     try {
       await chrome.scripting.executeScript({
         target: { tabId: state.tabId },
         files: ['content.js'],
       });
       usedInjection = true;
+      debugInfo.injectionSucceeded = true;
+      debugInfo.lastError = null; // injection succeeded — clear the previous sendMessage error
+      renderDebugPanel();
       console.log('[RoleRadar] Injection successful — retrying sendMessage');
+
       data = await chrome.tabs.sendMessage(state.tabId, { action: 'extract' });
     } catch (injectErr) {
+      debugInfo.injectionSucceeded = false;
+      debugInfo.extractSucceeded   = false;
+      debugInfo.lastError          = injectErr.message;
+      renderDebugPanel();
       console.error('[RoleRadar] Injection failed:', injectErr.message);
       showWarning('Could not access this LinkedIn job page. Reload the tab and try again.');
-      setExtractMsg('error', 'Could not extract job — reload the tab and try again.');
+      setExtractMsg('error', 'Injection failed: ' + injectErr.message);
       return;
     }
   }
 
-  // ── Handle response ────────────────────────────────────────────────────────
-  const suffix = usedInjection ? ' (after injection)' : '';
-  console.log('[RoleRadar] Extract response received' + suffix + ':', {
+  // ── Handle response ───────────────────────────────────────────────────────
+  const tag = usedInjection ? ' (after injection)' : '';
+  console.log('[RoleRadar] Extract response received' + tag + ':', {
     jobId:             data?.jobId,
     title:             data?.title?.slice(0, 50),
     company:           data?.company,
@@ -135,36 +190,70 @@ async function extractFromTab() {
   });
 
   if (!data) {
+    debugInfo.extractSucceeded = false;
+    debugInfo.lastError = 'sendMessage returned null/undefined';
+    renderDebugPanel();
     setExtractMsg('error', 'Could not extract job — empty response from page.');
     return;
   }
 
+  debugInfo.extractSucceeded  = true;
+  debugInfo.jobId             = data.jobId    ?? null;
+  debugInfo.title             = data.title    ?? null;
+  debugInfo.company           = data.company  ?? null;
+  debugInfo.location          = data.location ?? null;
+  debugInfo.descriptionLength = data.description?.length ?? 0;
+  debugInfo.isTruncated       = data.truncated ?? null;
+
+  const allEmpty = !data.title && !data.company && !data.location && !data.description;
+  if (allEmpty) {
+    debugInfo.lastError = 'Extraction succeeded but returned empty fields.';
+  }
+  renderDebugPanel();
+
   // Only overwrite a field when extraction found something — preserves manual edits.
-  if (data.jobId)       state.externalJobId  = data.jobId;
-  if (data.title)       elTitle.value        = data.title;
-  if (data.company)     elCompany.value      = data.company;
-  if (data.location)    elLocation.value     = data.location;
-  if (data.description) elDesc.value         = data.description;
+  if (data.jobId)       state.externalJobId = data.jobId;
+  if (data.title)       elTitle.value       = data.title;
+  if (data.company)     elCompany.value     = data.company;
+  if (data.location)    elLocation.value    = data.location;
+  if (data.description) elDesc.value        = data.description;
+
+  if (allEmpty) {
+    setExtractMsg('warning', 'Extraction succeeded but returned empty fields.');
+    return;
+  }
 
   if (data.truncated) {
-    showWarning(
-      'Description may be truncated. Expand the LinkedIn job description, then click ↺ Refresh.'
-    );
+    showWarning('Description may be truncated. Expand the LinkedIn job description, then click ↺ Refresh.');
     setExtractMsg('warning', 'Job extracted — description may be truncated');
   } else {
     setExtractMsg('ok', 'Job extracted');
   }
 }
 
+// ── Refresh / Debug Extract ───────────────────────────────────────────────────
+
 async function onRefresh() {
   if (!state.tabId) return;
-  console.log('[RoleRadar] ↺ Refresh extraction requested');
+  console.log('[RoleRadar] ↺ Refresh requested');
   btnRefresh.disabled = true;
   await extractFromTab();
   btnRefresh.disabled = false;
 }
 
-// ── Backend communication ────────────────────────────────────────────────────
+async function onDebugExtract() {
+  if (!state.tabId) {
+    debugInfo.lastError = 'No tab ID — reopen the popup';
+    renderDebugPanel();
+    return;
+  }
+  console.log('[RoleRadar] Debug Extract button clicked');
+  btnDebugExtract.disabled = true;
+  await extractFromTab();
+  btnDebugExtract.disabled = false;
+}
+
+// ── Backend communication ─────────────────────────────────────────────────────
 
 async function lookupBackend() {
   if (!state.url) return;
@@ -177,7 +266,6 @@ async function lookupBackend() {
       return;
     }
     const data = await res.json();
-    // Backend always returns 200 with {found, job}
     state.backendJob = data.found ? data.job : null;
     console.log('[RoleRadar] Lookup result: found =', data.found, 'id =', data.job?.id ?? null);
   } catch (err) {
@@ -234,13 +322,57 @@ async function refreshJobFromBackend(jobId) {
   } catch {}
 }
 
-// ── UI helpers ───────────────────────────────────────────────────────────────
+// ── Debug panel ───────────────────────────────────────────────────────────────
+
+function renderDebugPanel() {
+  if (!elDebugRows) return;
+
+  const rows = [
+    ['activeTabUrl',           debugInfo.activeTabUrl],
+    ['isJobPage',              debugInfo.isJobPage],
+    ['contentScriptAvailable', debugInfo.contentScriptAvailable],
+    ['injectionAttempted',     debugInfo.injectionAttempted],
+    ['injectionSucceeded',     debugInfo.injectionSucceeded],
+    ['extractSucceeded',       debugInfo.extractSucceeded],
+    ['jobId',                  debugInfo.jobId],
+    ['title',                  debugInfo.title],
+    ['company',                debugInfo.company],
+    ['location',               debugInfo.location],
+    ['descriptionLength',      debugInfo.descriptionLength],
+    ['isTruncated',            debugInfo.isTruncated],
+    ['lastError',              debugInfo.lastError],
+  ];
+
+  elDebugRows.innerHTML = rows.map(([key, val]) => {
+    const cls  = dvClass(key, val);
+    const text = dvText(val);
+    return `<div class="debug-row"><span class="debug-key">${key}</span><span class="${cls}">${esc(text)}</span></div>`;
+  }).join('');
+}
+
+function dvClass(key, val) {
+  if (key === 'lastError' && val !== null && val !== undefined) return 'debug-val dv-error';
+  if (val === null || val === undefined) return 'debug-val dv-null';
+  if (val === true)  return 'debug-val dv-true';
+  if (val === false) return 'debug-val dv-false';
+  return 'debug-val';
+}
+
+function dvText(val) {
+  if (val === null || val === undefined) return '—';
+  if (typeof val === 'boolean') return String(val);
+  const s = String(val);
+  return s.length > 62 ? s.slice(0, 59) + '…' : s;
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
 
 function refreshBadge() {
-  if (!state.backendJob) {
-    setBadge('New', 'new');
-    return;
-  }
+  if (!state.backendJob) { setBadge('New', 'new'); return; }
   const { status, latest_analysis } = state.backendJob;
   setBadge(
     latest_analysis ? `${cap(status)} · Analyzed` : cap(status),
@@ -259,13 +391,13 @@ function setExtractMsg(type, text) {
 }
 
 function showWarning(msg) {
-  elWarning.textContent    = msg;
-  elWarning.style.display  = 'block';
+  elWarning.textContent   = msg;
+  elWarning.style.display = 'block';
 }
 
 function clearWarning() {
-  elWarning.textContent    = '';
-  elWarning.style.display  = 'none';
+  elWarning.textContent   = '';
+  elWarning.style.display = 'none';
 }
 
 function setActionMsg(type, text) {
@@ -288,15 +420,13 @@ function getFields() {
   };
 }
 
-function cap(s) {
-  return s ? s[0].toUpperCase() + s.slice(1) : '';
-}
+function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : ''; }
 
 function fmtVerdict(v) {
   return v ? v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : v;
 }
 
-// ── Button handlers ──────────────────────────────────────────────────────────
+// ── Action button handlers ────────────────────────────────────────────────────
 
 async function onSave() {
   setActionButtons(false);
@@ -317,10 +447,8 @@ async function onApplied() {
   setActionButtons(false);
   setActionMsg('loading', 'Marking as applied…');
   try {
-    // POST to get or create the job, then PATCH regardless of current status.
     const job = state.backendJob || await ensureJob('saved');
     if (!state.backendJob) state.backendJob = job;
-
     await patchStatus(job.id, 'applied');
     state.backendJob = { ...state.backendJob, status: 'applied' };
     refreshBadge();
@@ -345,17 +473,13 @@ async function onAnalyze() {
       throw new Error(err.detail || `Analysis failed (${res.status})`);
     }
     const analysis = await res.json();
-    console.log('[RoleRadar] Analysis done:', {
-      verdict: analysis.verdict,
-      fit_score: analysis.fit_score,
-    });
+    console.log('[RoleRadar] Analysis done:', { verdict: analysis.verdict, fit_score: analysis.fit_score });
 
     await refreshJobFromBackend(job.id);
     refreshBadge();
 
     const score = typeof analysis.fit_score === 'number'
-      ? ` · ${analysis.fit_score.toFixed(1)}/10`
-      : '';
+      ? ` · ${analysis.fit_score.toFixed(1)}/10` : '';
     setActionMsg('success', `${fmtVerdict(analysis.verdict)}${score}`);
   } catch (e) {
     setActionMsg('error', e.message);

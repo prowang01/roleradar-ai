@@ -23,17 +23,14 @@
       justify-content: space-between;
       align-items: center;
     }
-    .header-title { font-weight: 700; font-size: 14px; letter-spacing: 0.01em; }
+    .header-title  { font-weight: 700; font-size: 14px; letter-spacing: 0.01em; }
+    .header-version { font-size: 10px; color: #94a3b8; font-weight: 400; margin-left: 6px; }
 
     /* ── Status badge ── */
     .badge {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 9px;
-      border-radius: 999px;
-      background: #6b7280;
-      color: white;
-      white-space: nowrap;
+      font-size: 11px; font-weight: 600;
+      padding: 2px 9px; border-radius: 999px;
+      background: #6b7280; color: white; white-space: nowrap;
     }
     .badge-new       { background: #6b7280; }
     .badge-saved     { background: #0077b5; }
@@ -59,52 +56,33 @@
     /* ── Form fields ── */
     .form {
       padding: 12px 14px 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+      display: flex; flex-direction: column; gap: 8px;
     }
     .field { display: flex; flex-direction: column; gap: 3px; }
     .field label {
-      font-size: 10px;
-      font-weight: 700;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      font-size: 10px; font-weight: 700;
+      color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;
     }
-    .field input,
-    .field textarea {
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      padding: 5px 8px;
-      font-size: 12px;
-      font-family: inherit;
-      background: white;
-      color: #111827;
-      resize: none;
+    .field input, .field textarea {
+      border: 1px solid #d1d5db; border-radius: 4px;
+      padding: 5px 8px; font-size: 12px; font-family: inherit;
+      background: white; color: #111827; resize: none;
     }
-    .field input:focus,
-    .field textarea:focus {
-      outline: none;
-      border-color: #0077b5;
+    .field input:focus, .field textarea:focus {
+      outline: none; border-color: #0077b5;
       box-shadow: 0 0 0 2px rgba(0,119,181,0.15);
     }
     .field textarea { height: 84px; }
 
     /* ── Extract status bar ── */
     .extract-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: flex; justify-content: space-between; align-items: center;
       padding: 6px 14px 10px;
     }
     #extract-msg {
-      font-size: 11px;
-      color: #9ca3af;
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      font-size: 11px; color: #9ca3af;
+      flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     #extract-msg.ok      { color: #16a34a; }
     #extract-msg.warning { color: #d97706; }
@@ -112,41 +90,27 @@
     #extract-msg.loading { color: #9ca3af; font-style: italic; }
 
     #btn-refresh {
-      flex-shrink: 0;
-      margin-left: 8px;
-      font-size: 11px;
-      font-family: inherit;
-      padding: 3px 10px;
-      background: white;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      cursor: pointer;
-      color: #374151;
+      flex-shrink: 0; margin-left: 8px;
+      font-size: 11px; font-family: inherit;
+      padding: 3px 10px; background: white;
+      border: 1px solid #d1d5db; border-radius: 4px;
+      cursor: pointer; color: #374151;
     }
-    #btn-refresh:hover { background: #f3f4f6; border-color: #9ca3af; }
+    #btn-refresh:hover    { background: #f3f4f6; border-color: #9ca3af; }
     #btn-refresh:disabled { opacity: 0.45; cursor: not-allowed; }
 
     /* ── Action buttons ── */
     .actions {
-      padding: 0 14px 12px;
-      display: flex;
-      gap: 8px;
+      padding: 10px 14px 12px;
+      display: flex; gap: 8px;
       border-top: 1px solid #e5e7eb;
-      padding-top: 10px;
     }
     .actions button {
-      flex: 1;
-      padding: 8px 0;
-      border: none;
-      border-radius: 5px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      color: white;
-      font-family: inherit;
-      transition: opacity 0.1s;
+      flex: 1; padding: 8px 0; border: none; border-radius: 5px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      color: white; font-family: inherit; transition: opacity 0.1s;
     }
-    .actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .actions button:disabled    { opacity: 0.4; cursor: not-allowed; }
     .actions button:not(:disabled):hover { opacity: 0.85; }
     #btn-save    { background: #0077b5; }
     #btn-applied { background: #16a34a; }
@@ -155,21 +119,59 @@
     /* ── Action status message ── */
     #status-msg {
       padding: 6px 14px 10px;
-      font-size: 11px;
-      min-height: 24px;
+      font-size: 11px; min-height: 24px;
       border-top: 1px solid #e5e7eb;
-      color: #6b7280;
-      line-height: 1.4;
+      color: #6b7280; line-height: 1.4;
     }
     #status-msg.loading { color: #6b7280; font-style: italic; }
     #status-msg.success { color: #16a34a; font-weight: 600; }
     #status-msg.error   { color: #dc2626; }
+
+    /* ── Debug panel ── */
+    .debug-panel { background: #0f172a; border-top: 2px solid #0f172a; }
+    .debug-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 12px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .debug-title {
+      font-size: 10px; font-weight: 700;
+      color: #475569; text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    #btn-debug-extract {
+      font-size: 10px; font-family: inherit;
+      padding: 3px 9px; background: #1e293b;
+      border: 1px solid #334155; border-radius: 3px;
+      color: #94a3b8; cursor: pointer;
+    }
+    #btn-debug-extract:hover    { background: #334155; color: #e2e8f0; }
+    #btn-debug-extract:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #debug-rows {
+      padding: 8px 12px 12px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .debug-row {
+      display: flex; gap: 8px;
+      font-size: 10px;
+      font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+      line-height: 1.55;
+    }
+    .debug-key      { color: #475569; min-width: 178px; flex-shrink: 0; }
+    .debug-val      { color: #94a3b8; word-break: break-all; }
+    .dv-true        { color: #4ade80; }
+    .dv-false       { color: #f87171; }
+    .dv-error       { color: #f87171; font-style: italic; word-break: break-all; }
+    .dv-null        { color: #334155; }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <span class="header-title">RoleRadar AI</span>
+    <span class="header-title">
+      RoleRadar AI
+      <span class="header-version">v0.3-debug</span>
+    </span>
     <span id="badge" class="badge">—</span>
   </div>
 
@@ -206,6 +208,14 @@
   </div>
 
   <div id="status-msg"></div>
+
+  <div class="debug-panel">
+    <div class="debug-header">
+      <span class="debug-title">Debug</span>
+      <button id="btn-debug-extract">Debug Extract</button>
+    </div>
+    <div id="debug-rows"></div>
+  </div>
 
   <script src="popup.js"></script>
 </body>
