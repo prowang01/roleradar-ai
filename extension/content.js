@@ -89,6 +89,11 @@ const DESC_END_MARKERS = [
   "Essayer Premium",
   "En savoir plus sur l’entreprise",
   "En savoir plus sur l’entreprise",
+  // French — benefits block
+  "Avantages trouvés dans l'offre d'emploi",
+  "Avantages trouvés dans l'offre d'emploi",
+  "Avantages de l'emploi",
+  "Avantages de l'emploi",
   // English
   "Faster job searches",
   "See how you compare",
@@ -98,10 +103,15 @@ const DESC_END_MARKERS = [
   "More jobs",
   "Try Premium",
   "Learn more about the company",
+  "Job benefits",
+  "Benefits",
 ];
 
 // Standalone UI fragments to strip from extracted description text.
 const DESC_NOISE_LINES_RE = /^(plus|voir plus|show more|tout afficher|see more|afficher moins|show less)$/i;
+
+// Trailing "plus" fragments LinkedIn appends after truncated text.
+const DESC_TRAILING_PLUS_RE = /\s*(\.\.\.\s*plus|plus\s*\.\.\.|\bplus)\s*$/i;
 
 // Noise lines to skip when scanning bodyText for location
 const LOCATION_NOISE_RE = /^(Postuler|Apply now|Apply|Enregistrer|Save|Suivre|Follow|Se connecter|Connect|Message|Partager|Share|Signaler|Report|Promoted|Sponsorisé|\d+ candidat|\d+ applicant|Easy Apply|Candidature simplifiée)$/i;
@@ -330,6 +340,7 @@ function cleanDescription(raw) {
     })
     .join('\n');
   text = text.replace(/\n{3,}/g, '\n\n').trim();
+  text = text.replace(DESC_TRAILING_PLUS_RE, '').trim();
   return text;
 }
 
