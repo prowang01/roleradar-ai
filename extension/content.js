@@ -54,7 +54,6 @@ const SHOW_MORE_SELECTORS = [
   'button[aria-label*="more"]',
 ];
 
-// Panels that contain job details on search-results pages
 const DETAIL_PANEL_SELECTORS = [
   '.jobs-search__job-details--container',
   '.scaffold-layout__detail',
@@ -62,6 +61,39 @@ const DETAIL_PANEL_SELECTORS = [
   '.job-view-layout',
   '[data-test-id="job-detail-view"]',
 ];
+
+// Section markers for description extraction from bodyText.
+const DESC_START_MARKERS = [
+  "À propos de l’offre d’emploi",  // typographic apostrophes
+  "À propos du poste",
+  "À propos de l’offre",
+  "À propos de l'offre d'emploi",                 // straight apostrophes
+  "À propos du poste",
+  "À propos de l'offre",
+  "About the job",
+  "About this job",
+  "Description du poste",
+  "Job details",
+];
+
+const DESC_END_MARKERS = [
+  "À propos de l’entreprise",
+  "À propos de l'entreprise",
+  "About the company",
+  "Personnes que vous pouvez contacter",
+  "People you can contact",
+  "Rencontrez l’équipe",
+  "Rencontrez l'équipe",
+  "Meet the hiring team",
+  "Des recherches d’emploi plus rapides",
+  "Des recherches d'emploi plus rapides",
+  "Faster job searches",
+  "Découvrez comment vous vous positionnez",
+  "See how you compare",
+];
+
+// Noise lines to skip when scanning bodyText for location
+const LOCATION_NOISE_RE = /^(Postuler|Apply now|Apply|Enregistrer|Save|Suivre|Follow|Se connecter|Connect|Message|Partager|Share|Signaler|Report|Promoted|Sponsorisé|\d+ candidat|\d+ applicant|Easy Apply|Candidature simplifiée)$/i;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,155 +119,263 @@ function tryText(selectors) {
   return null;
 }
 
+// ── Job ID ────────────────────────────────────────────────────────────────────
+
 function extractJobId(url) {
+  // 1. currentJobId query param
   try {
     const p = new URL(url).searchParams.get('currentJobId');
     if (p && /^\d+$/.test(p)) return p;
   } catch {}
+  // 2. /jobs/view/{id} in the current URL
   const m = url.match(/\/jobs\/view\/(\d+)/);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // 3. First link whose href contains /jobs/view/{id}
+  for (const el of document.querySelectorAll('a[href*="/jobs/view/"]')) {
+    const hm = (el.href || '').match(/\/jobs\/view\/(\d+)/);
+    if (hm) return hm[1];
+  }
+  return null;
 }
 
-// ── Improved extraction with broad fallbacks ─────────────────────────────────
+// ── Title ─────────────────────────────────────────────────────────────────────
+// Returns { value: string|null, source: string|null }
 
-function extractTitle() {
+function extractTitle(jobId) {
   // 1. Specific class-based selectors
   const fromSel = tryText(TITLE_SELECTORS);
-  if (fromSel) return fromSel;
+  if (fromSel) return { value: fromSel, source: 'selector' };
 
-  // 2. Any visible h1 on the page
+  // 2. Any visible h1
   for (const el of document.querySelectorAll('h1')) {
     if (!isVisible(el)) continue;
     const text = (el.innerText || '').trim();
     if (text && text.length < 200) {
       console.log('[RoleRadar:content] Title from visible h1:', text.slice(0, 60));
-      return text;
+      return { value: text, source: 'h1' };
     }
   }
 
-  // 3. document.title — LinkedIn format: "Title - Company | LinkedIn"
-  //    or "Title chez Company | LinkedIn"
+  // 3. Job link text matching /jobs/view/{jobId}
+  const jobLinkSel = jobId ? `a[href*="/jobs/view/${jobId}"]` : 'a[href*="/jobs/view/"]';
+  for (const el of document.querySelectorAll(jobLinkSel)) {
+    const text = (el.innerText || '').trim();
+    if (text && text.length < 200 && !text.includes('\n')) {
+      console.log('[RoleRadar:content] Title from job link:', text.slice(0, 60));
+      return { value: text, source: 'job-link' };
+    }
+  }
+
+  // 4. docTitle: "Title | Company | LinkedIn" → first segment before " | "
   const dt = document.title;
   if (dt) {
-    for (const sep of [' | ', ' – ', ' - ']) {
+    const pipeIdx = dt.indexOf(' | ');
+    if (pipeIdx > 0) {
+      const part = dt.slice(0, pipeIdx).trim();
+      if (part && part !== 'LinkedIn') {
+        console.log('[RoleRadar:content] Title from docTitle:', part.slice(0, 60));
+        return { value: part, source: 'docTitle' };
+      }
+    }
+    for (const sep of [' – ', ' - ']) {
       const i = dt.indexOf(sep);
       if (i > 0) {
         const part = dt.slice(0, i).trim();
-        // Strip trailing company from "Title chez Company"
-        const chezMatch = part.match(/^(.+?) (?:chez|at|@) .+$/);
-        return chezMatch ? chezMatch[1].trim() : part;
+        if (part && part !== 'LinkedIn') return { value: part, source: 'docTitle' };
       }
     }
   }
 
-  return null;
+  // 5. bodyText "Sélectionné, Title" pattern
+  const bodyText = document.body?.innerText || '';
+  const selMatch = bodyText.match(/S(?:é|e)lectionn(?:é|e)[,\s]+(.+)/);
+  if (selMatch) {
+    const text = selMatch[1].trim().split('\n')[0].trim();
+    if (text && text.length < 200) {
+      console.log('[RoleRadar:content] Title from bodyText selected block:', text.slice(0, 60));
+      return { value: text, source: 'bodyText' };
+    }
+  }
+
+  return { value: null, source: null };
 }
 
-function extractCompany() {
-  // 1. Specific selectors (company link in top card)
-  const fromSel = tryText(COMPANY_SELECTORS);
-  if (fromSel) return fromSel;
+// ── Company ───────────────────────────────────────────────────────────────────
+// Returns { value: string|null, source: string|null }
 
-  // 2. Any visible link to a /company/ path near the top
+function extractCompany(title) {
+  // 1. Specific selectors
+  const fromSel = tryText(COMPANY_SELECTORS);
+  if (fromSel) return { value: fromSel, source: 'selector' };
+
+  // 2. First visible /company/ link with short, single-line text
   for (const el of document.querySelectorAll('a[href*="/company/"]')) {
     if (!isVisible(el)) continue;
     const text = (el.innerText || '').trim();
     if (text && text.length < 100 && !text.includes('\n')) {
       console.log('[RoleRadar:content] Company from /company/ link:', text);
-      return text;
+      return { value: text, source: 'company-link' };
     }
   }
 
-  // 3. Parse from document.title: "Title chez Company | LinkedIn"
-  //    or "Title - Company | LinkedIn"
+  // 3. docTitle: "Title | Company | LinkedIn" → second segment
   const dt = document.title;
   if (dt) {
-    const chezMatch = dt.match(/^.+? (?:chez|at|@) (.+?)(?:\s*[|–]|$)/);
-    if (chezMatch) return chezMatch[1].trim();
-
-    // "Title - Company | LinkedIn" → second segment before " | "
     const parts = dt.split(' | ');
     if (parts.length >= 2) {
-      const seg0 = parts[0];
-      const dashParts = seg0.split(' - ');
-      if (dashParts.length >= 2) return dashParts[dashParts.length - 1].trim();
+      const company = parts[1].trim();
+      if (company && company !== 'LinkedIn') {
+        console.log('[RoleRadar:content] Company from docTitle second segment:', company);
+        return { value: company, source: 'docTitle' };
+      }
+    }
+    // "Title chez Company | LinkedIn" format
+    const chezMatch = dt.match(/^.+? (?:chez|at|@) (.+?)(?:\s*[|–\-]|$)/);
+    if (chezMatch) {
+      const company = chezMatch[1].trim();
+      if (company && company !== 'LinkedIn') {
+        console.log('[RoleRadar:content] Company from docTitle chez:', company);
+        return { value: company, source: 'docTitle-chez' };
+      }
     }
   }
 
-  return null;
+  // 4. bodyText: first non-empty line after the title
+  if (title) {
+    const bodyText = document.body?.innerText || '';
+    const titleIdx = bodyText.indexOf(title);
+    if (titleIdx >= 0) {
+      const after = bodyText.slice(titleIdx + title.length);
+      const lines = after.split('\n');
+      for (const line of lines) {
+        const t = line.trim();
+        if (t && t.length < 100 && t !== title && !LOCATION_NOISE_RE.test(t)) {
+          console.log('[RoleRadar:content] Company from bodyText after title:', t);
+          return { value: t, source: 'bodyText' };
+        }
+      }
+    }
+  }
+
+  return { value: null, source: null };
 }
 
-function extractLocation() {
+// ── Location ──────────────────────────────────────────────────────────────────
+// Returns { value: string|null, source: string|null }
+
+function extractLocation(title, company) {
   // 1. Specific selectors
   const fromSel = tryText(LOCATION_SELECTORS);
-  if (fromSel) return fromSel;
+  if (fromSel) return { value: fromSel, source: 'selector' };
 
-  // 2. Second .tvm__text element (first = company name, second = location on LinkedIn)
+  // 2. Second visible .tvm__text element (first = company, second = location on LinkedIn)
   const tvmEls = [...document.querySelectorAll('.tvm__text')].filter(isVisible);
   if (tvmEls.length >= 2) {
     const text = (tvmEls[1].innerText || '').trim();
     if (text) {
       console.log('[RoleRadar:content] Location from tvm__text[1]:', text);
-      return text;
+      return { value: text, source: 'tvm' };
     }
   }
 
-  return null;
+  // 3. bodyText: first non-noise line after title then company
+  if (title && company) {
+    const bodyText = document.body?.innerText || '';
+    const titleIdx = bodyText.indexOf(title);
+    if (titleIdx >= 0) {
+      const afterTitle = bodyText.slice(titleIdx + title.length);
+      const compIdx = afterTitle.indexOf(company);
+      if (compIdx >= 0) {
+        const afterComp = afterTitle.slice(compIdx + company.length);
+        const lines = afterComp.split('\n');
+        for (const line of lines) {
+          const t = line.trim();
+          if (t && t.length > 1 && t.length < 100 && !LOCATION_NOISE_RE.test(t) && t !== title && t !== company) {
+            console.log('[RoleRadar:content] Location from bodyText after company:', t);
+            return { value: t, source: 'bodyText' };
+          }
+        }
+      }
+    }
+  }
+
+  return { value: null, source: null };
 }
 
+// ── Description ───────────────────────────────────────────────────────────────
+// Returns { value: string|null, source: string|null }
+
 function extractDescription() {
-  // 1. Specific selectors — require meaningful length
+  // 1. Specific DOM selectors
   for (const sel of DESC_SELECTORS) {
     try {
       const el = document.querySelector(sel);
       if (el) {
         const text = (el.innerText || '').trim();
-        if (text.length > 80) return text;
+        if (text.length > 80) return { value: text, source: 'selector' };
       }
     } catch {}
   }
 
-  // 2. Any section whose heading contains "About the job" / "À propos…"
-  const ABOUT_MARKERS = [
-    "À propos de l'offre d'emploi",
-    "À propos du poste",
-    "À propos de l'offre",
-    "About the job",
-    "About this job",
-    "Description du poste",
-    "Job details",
-  ];
-  for (const marker of ABOUT_MARKERS) {
+  // 2. DOM: any element whose text exactly matches a start marker, then read context
+  for (const marker of DESC_START_MARKERS) {
     for (const heading of document.querySelectorAll('h1,h2,h3,h4,h5,div,span')) {
       const ht = (heading.innerText || heading.textContent || '').trim();
       if (ht !== marker && !ht.startsWith(marker + '\n')) continue;
-
-      // Try the parent container's full text
       const parentText = heading.parentElement?.innerText?.trim();
       if (parentText && parentText.length > 200) {
-        console.log('[RoleRadar:content] Description from About section via parent');
-        return parentText.slice(0, 10000);
+        const cleaned = parentText.startsWith(marker)
+          ? parentText.slice(marker.length).trim()
+          : parentText;
+        if (cleaned.length > 80) {
+          console.log('[RoleRadar:content] Description from DOM section heading (parent)');
+          return { value: cleaned.slice(0, 10000), source: 'dom-section' };
+        }
       }
-      // Try next siblings
       let sib = heading.nextElementSibling;
       while (sib) {
         const st = sib.innerText?.trim();
         if (st && st.length > 100) {
-          console.log('[RoleRadar:content] Description from About section next-sibling');
-          return st.slice(0, 10000);
+          console.log('[RoleRadar:content] Description from DOM section heading (sibling)');
+          return { value: st.slice(0, 10000), source: 'dom-sibling' };
         }
         sib = sib.nextElementSibling;
       }
     }
   }
 
-  // 3. Largest text block inside the known detail panels
+  // 3. bodyText: extract text between start and end markers
+  const bodyText = document.body?.innerText || '';
+  let startIdx = -1;
+  let startMarkerLen = 0;
+  for (const marker of DESC_START_MARKERS) {
+    const idx = bodyText.indexOf(marker);
+    if (idx >= 0 && (startIdx < 0 || idx < startIdx)) {
+      startIdx = idx;
+      startMarkerLen = marker.length;
+    }
+  }
+  if (startIdx >= 0) {
+    const afterStart = bodyText.slice(startIdx + startMarkerLen).trimStart();
+    let endIdx = afterStart.length;
+    for (const endMarker of DESC_END_MARKERS) {
+      const idx = afterStart.indexOf(endMarker);
+      if (idx >= 0 && idx < endIdx) endIdx = idx;
+    }
+    const desc = afterStart.slice(0, endIdx).trim();
+    if (desc.length > 50) {
+      console.log('[RoleRadar:content] Description from bodyText section, len:', desc.length);
+      return { value: desc.slice(0, 10000), source: 'bodyText-section' };
+    }
+  }
+
+  // 4. Largest text block inside known detail panels
   let bestText = '', bestLen = 0;
   for (const panelSel of DETAIL_PANEL_SELECTORS) {
     const panel = document.querySelector(panelSel);
     if (!panel) continue;
     for (const el of panel.querySelectorAll('div,section,article,p')) {
-      if (el.children.length > 6) continue; // skip layout wrappers
+      if (el.children.length > 6) continue;
       const text = (el.innerText || '').trim();
       if (text.length > bestLen && text.length > 200 && text.length < 20000) {
         bestLen = text.length;
@@ -246,11 +386,13 @@ function extractDescription() {
   }
   if (bestText) {
     console.log('[RoleRadar:content] Description from largest detail-panel block, len:', bestLen);
-    return bestText;
+    return { value: bestText, source: 'panel-largest' };
   }
 
-  return null;
+  return { value: null, source: null };
 }
+
+// ── Truncation check ──────────────────────────────────────────────────────────
 
 function isTruncated() {
   for (const sel of SHOW_MORE_SELECTORS) {
@@ -268,7 +410,6 @@ function isTruncated() {
 }
 
 // ── DOM reconnaissance payload ────────────────────────────────────────────────
-// Returns a structured snapshot of the page for selector debugging.
 
 function collectDomDebug() {
   function texts(sel) {
@@ -339,21 +480,34 @@ if (!window.__roleradarInjected) {
       const url = window.location.href;
       console.log('[RoleRadar:content] Extract request, URL:', url);
 
+      const jobId       = extractJobId(url);
+      const titleRes    = extractTitle(jobId);
+      const companyRes  = extractCompany(titleRes.value);
+      const locationRes = extractLocation(titleRes.value, companyRes.value);
+      const descRes     = extractDescription();
+
       const result = {
-        jobId:       extractJobId(url),
-        title:       extractTitle(),
-        company:     extractCompany(),
-        location:    extractLocation(),
-        description: extractDescription(),
-        truncated:   isTruncated(),
+        jobId,
+        title:             titleRes.value,
+        titleSource:       titleRes.source,
+        company:           companyRes.value,
+        companySource:     companyRes.source,
+        location:          locationRes.value,
+        locationSource:    locationRes.source,
+        description:       descRes.value,
+        descriptionSource: descRes.source,
+        truncated:         isTruncated(),
       };
 
       console.log('[RoleRadar:content] Extract result:', {
-        jobId:             result.jobId,
+        jobId,
         title:             result.title?.slice(0, 50),
+        titleSource:       result.titleSource,
         company:           result.company,
-        locationLength:    result.location?.length ?? 0,
+        companySource:     result.companySource,
+        locationSource:    result.locationSource,
         descriptionLength: result.description?.length ?? 0,
+        descriptionSource: result.descriptionSource,
         truncated:         result.truncated,
       });
 

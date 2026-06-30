@@ -22,9 +22,13 @@ const debugInfo = {
   extractSucceeded:       null,
   jobId:                  null,
   title:                  null,
+  titleSource:            null,
   company:                null,
+  companySource:          null,
   location:               null,
+  locationSource:         null,
   descriptionLength:      null,
+  descriptionSource:      null,
   isTruncated:            null,
   lastError:              null,
 };
@@ -122,6 +126,10 @@ async function extractFromTab() {
   debugInfo.injectionAttempted     = false;
   debugInfo.injectionSucceeded     = null;
   debugInfo.extractSucceeded       = null;
+  debugInfo.titleSource            = null;
+  debugInfo.companySource          = null;
+  debugInfo.locationSource         = null;
+  debugInfo.descriptionSource      = null;
   debugInfo.lastError              = null;
   renderDebugPanel();
 
@@ -205,14 +213,25 @@ async function extractFromTab() {
   debugInfo.extractSucceeded  = true;
   debugInfo.jobId             = data.jobId    ?? null;
   debugInfo.title             = data.title    ?? null;
+  debugInfo.titleSource       = data.titleSource       ?? null;
   debugInfo.company           = data.company  ?? null;
+  debugInfo.companySource     = data.companySource     ?? null;
   debugInfo.location          = data.location ?? null;
+  debugInfo.locationSource    = data.locationSource    ?? null;
   debugInfo.descriptionLength = data.description?.length ?? 0;
+  debugInfo.descriptionSource = data.descriptionSource ?? null;
   debugInfo.isTruncated       = data.truncated ?? null;
 
-  const allEmpty = !data.title && !data.company && !data.location && !data.description;
+  const allEmpty    = !data.title && !data.company && !data.location && !data.description;
+  const hasIdentity = !!(data.title || data.company);
+  const hasDesc     = !!data.description;
+
   if (allEmpty) {
     debugInfo.lastError = 'Content script works, but LinkedIn DOM selectors found no job data.';
+  } else if (hasIdentity && !hasDesc) {
+    debugInfo.lastError = 'Description not found — expand "Show more" on LinkedIn then click ↺ Refresh.';
+  } else {
+    debugInfo.lastError = null;
   }
   renderDebugPanel();
 
@@ -228,8 +247,14 @@ async function extractFromTab() {
     return;
   }
 
+  if (hasIdentity && !hasDesc) {
+    showWarning('Description not found. Expand "Show more" / "Tout afficher" on LinkedIn, then click ↺ Refresh.');
+    setExtractMsg('warning', 'Partial — title & company found, description missing');
+    return;
+  }
+
   if (data.truncated) {
-    showWarning('Description may be truncated. Expand the LinkedIn job description, then click ↺ Refresh.');
+    showWarning('Description may be truncated. Expand "Show more" on LinkedIn, then click ↺ Refresh.');
     setExtractMsg('warning', 'Job extracted — description may be truncated');
   } else {
     setExtractMsg('ok', 'Job extracted');
@@ -389,9 +414,13 @@ function renderDebugPanel() {
     ['extractSucceeded',       debugInfo.extractSucceeded],
     ['jobId',                  debugInfo.jobId],
     ['title',                  debugInfo.title],
+    ['titleSource',            debugInfo.titleSource],
     ['company',                debugInfo.company],
+    ['companySource',          debugInfo.companySource],
     ['location',               debugInfo.location],
+    ['locationSource',         debugInfo.locationSource],
     ['descriptionLength',      debugInfo.descriptionLength],
+    ['descriptionSource',      debugInfo.descriptionSource],
     ['isTruncated',            debugInfo.isTruncated],
     ['lastError',              debugInfo.lastError],
   ];
