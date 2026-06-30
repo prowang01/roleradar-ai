@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "RoleRadar AI",
+  "version": "0.1.0",
+  "description": "One-click LinkedIn job capture for RoleRadar AI.",
+
+  "permissions": ["activeTab"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "http://localhost:8000/*"
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "RoleRadar AI"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.linkedin.com/jobs/view/*",
+        "https://www.linkedin.com/jobs/search-results/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

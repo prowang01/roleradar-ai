@@ -51,6 +51,22 @@ def list_jobs(
     return q.order_by(Job.created_at.desc()).all()
 
 
+@router.get("/lookup", response_model=JobDetailResponse)
+def lookup_job(url: str = Query(..., description="Exact job URL"), db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.url == url.strip()).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    latest = None
+    if job.analyses:
+        latest = max(job.analyses, key=lambda a: a.created_at)
+
+    result = JobDetailResponse.model_validate(job)
+    if latest:
+        result.latest_analysis = FitAnalysisResponse.model_validate(latest)
+    return result
+
+
 @router.get("/{job_id}", response_model=JobDetailResponse)
 def get_job(job_id: int, db: Session = Depends(get_db)):
     job = db.query(Job).filter(Job.id == job_id).first()

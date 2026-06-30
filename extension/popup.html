@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>RoleRadar AI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      width: 360px;
+      background: #f9fafb;
+      color: #111827;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: #1e293b;
+      color: white;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header-title {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Status badge ── */
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: #6b7280;
+      color: white;
+      white-space: nowrap;
+    }
+    .badge-new       { background: #6b7280; }
+    .badge-saved     { background: #0077b5; }
+    .badge-applied   { background: #16a34a; }
+    .badge-rejected  { background: #dc2626; }
+    .badge-oa        { background: #d97706; }
+    .badge-interview { background: #2563eb; }
+    .badge-offer     { background: #059669; }
+    .badge-archived  { background: #9ca3af; }
+    .badge-analyzed  { background: #7c3aed; }
+
+    /* ── Warning banner ── */
+    #warning {
+      display: none;
+      background: #fef9c3;
+      border-left: 3px solid #ca8a04;
+      color: #713f12;
+      font-size: 11px;
+      padding: 7px 12px;
+      line-height: 1.5;
+    }
+
+    /* ── Form fields ── */
+    .form {
+      padding: 12px 14px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .field label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .field input,
+    .field textarea {
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-family: inherit;
+      background: white;
+      color: #111827;
+      resize: none;
+    }
+    .field input:focus,
+    .field textarea:focus {
+      outline: none;
+      border-color: #0077b5;
+      box-shadow: 0 0 0 2px rgba(0,119,181,0.15);
+    }
+    .field textarea { height: 84px; }
+
+    /* ── Action buttons ── */
+    .actions {
+      padding: 12px 14px;
+      display: flex;
+      gap: 8px;
+    }
+    .actions button {
+      flex: 1;
+      padding: 8px 0;
+      border: none;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      color: white;
+      transition: opacity 0.1s;
+    }
+    .actions button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .actions button:not(:disabled):hover { opacity: 0.85; }
+    #btn-save    { background: #0077b5; }
+    #btn-applied { background: #16a34a; }
+    #btn-analyze { background: #7c3aed; }
+
+    /* ── Status message ── */
+    #status-msg {
+      padding: 6px 14px 10px;
+      font-size: 11px;
+      min-height: 24px;
+      border-top: 1px solid #e5e7eb;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+    #status-msg.msg-loading  { color: #6b7280; }
+    #status-msg.msg-success  { color: #16a34a; font-weight: 600; }
+    #status-msg.msg-error    { color: #dc2626; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <span class="header-title">RoleRadar AI</span>
+    <span id="badge" class="badge">—</span>
+  </div>
+
+  <div id="warning"></div>
+
+  <div class="form">
+    <div class="field">
+      <label>Title</label>
+      <input id="f-title" type="text" placeholder="Job title">
+    </div>
+    <div class="field">
+      <label>Company</label>
+      <input id="f-company" type="text" placeholder="Company name">
+    </div>
+    <div class="field">
+      <label>Location</label>
+      <input id="f-location" type="text" placeholder="Location">
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="f-desc" placeholder="Expand 'Show more' on LinkedIn first, then open this popup"></textarea>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="btn-save">Save</button>
+    <button id="btn-applied">Applied</button>
+    <button id="btn-analyze">Analyze</button>
+  </div>
+
+  <div id="status-msg"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
