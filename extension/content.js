@@ -70,14 +70,20 @@ const DESC_START_MARKERS = [
   "About this job",
 ];
 
-// All LinkedIn noise sections that follow the job description.
-// Cut at the earliest match found after the start marker.
+// LinkedIn-generated noise sections that follow the job description.
+// Matched as line-prefixes (a line that STARTS WITH the marker triggers the cut),
+// so "Des recherches d’emploi plus rapides avec Premium" is caught by the shorter marker.
+// Generic author-written headings (Benefits, What we offer, Perks) are intentionally absent.
 const DESC_END_MARKERS = [
-  // French
-  "Des recherches d’emploi plus rapides",
-  "Des recherches d’emploi plus rapides",
+  // French — LinkedIn Premium upsell
+  "Des recherches d’emploi plus rapides",   // typographic apostrophe
+  "Des recherches d’emploi plus rapides",   // straight apostrophe
   "Découvrez comment vous vous positionnez",
   "Découvrez comment vous vous positionnez",
+  "Accédez à des informations exclusives",
+  "Accédez à des informations exclusives",
+  "Essayer Premium",
+  // French — LinkedIn-generated sections
   "À propos de l’entreprise",
   "À propos de l’entreprise",
   "Personnes que vous pouvez contacter",
@@ -86,28 +92,28 @@ const DESC_END_MARKERS = [
   "Rencontrez l’equipe",
   "Voir plus d’offres",
   "Voir plus d’offres",
-  "Essayer Premium",
   "En savoir plus sur l’entreprise",
   "En savoir plus sur l’entreprise",
-  // French — LinkedIn-generated benefits block (not author-written Benefits sections)
-  "Avantages trouvés dans l'offre d'emploi",
-  "Avantages trouvés dans l'offre d'emploi",
-  // English
+  // French — LinkedIn-generated benefits block (never author-written)
+  "Avantages trouvés dans l’offre d’emploi",
+  "Avantages trouvés dans l’offre d’emploi",
+  // English — LinkedIn Premium upsell
   "Faster job searches",
   "See how you compare",
+  "Try Premium",
+  // English — LinkedIn-generated sections
   "About the company",
   "People you can contact",
   "Meet the hiring team",
   "More jobs",
-  "Try Premium",
   "Learn more about the company",
 ];
 
 // Standalone UI fragments to strip from extracted description text.
 const DESC_NOISE_LINES_RE = /^(plus|voir plus|show more|tout afficher|see more|afficher moins|show less)$/i;
 
-// Trailing "plus" fragments LinkedIn appends after truncated text.
-const DESC_TRAILING_PLUS_RE = /\s*(\.\.\.\s*plus|plus\s*\.\.\.|\bplus)\s*$/i;
+// Trailing LinkedIn UI fragments appended after truncated text.
+const DESC_TRAILING_PLUS_RE = /\s*(\.\.\.\s*plus|plus\s*\.\.\.|\bplus|\.\.\.)\s*$/i;
 
 // Noise lines to skip when scanning bodyText for location
 const LOCATION_NOISE_RE = /^(Postuler|Apply now|Apply|Enregistrer|Save|Suivre|Follow|Se connecter|Connect|Message|Partager|Share|Signaler|Report|Promoted|Sponsorisé|\d+ candidat|\d+ applicant|Easy Apply|Candidature simplifiée)$/i;
@@ -345,15 +351,15 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Cut text at the first end marker that appears as a standalone line.
-// Substring matches mid-sentence are ignored — the marker must occupy its own line.
+// Cut text at the first end marker whose text appears at the START of a line.
+// "Starts with" semantics: "Des recherches d'emploi plus rapides avec Premium" is caught
+// by the marker "Des recherches d'emploi plus rapides".
+// Mid-sentence occurrences are ignored because the marker must begin at a line boundary.
 function sliceByEndMarkers(text) {
   let endIdx = text.length;
   let foundEnd = null;
   for (const marker of DESC_END_MARKERS) {
-    // Match the marker only when it is the entire content of a line
-    // (optional surrounding whitespace/tabs allowed, but nothing else on that line).
-    const re = new RegExp('(?:^|\\n)[ \\t]*' + escapeRegex(marker) + '[ \\t]*(?=\\n|$)', 'i');
+    const re = new RegExp('(?:^|\\n)[ \\t]*' + escapeRegex(marker), 'i');
     const m = re.exec(text);
     if (m && m.index < endIdx) {
       endIdx = m.index;
