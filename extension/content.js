@@ -62,35 +62,46 @@ const DETAIL_PANEL_SELECTORS = [
   '[data-test-id="job-detail-view"]',
 ];
 
-// Section markers for description extraction from bodyText.
+// Strict start markers — only genuine "About the job" headings.
 const DESC_START_MARKERS = [
-  "À propos de l’offre d’emploi",  // typographic apostrophes
-  "À propos du poste",
-  "À propos de l’offre",
-  "À propos de l'offre d'emploi",                 // straight apostrophes
-  "À propos du poste",
-  "À propos de l'offre",
+  "À propos de l’offre d’emploi",  // typographic apostrophes (U+2019)
+  "À propos de l’offre d’emploi",             // straight apostrophes
   "About the job",
   "About this job",
-  "Description du poste",
-  "Job details",
 ];
 
+// All LinkedIn noise sections that follow the job description.
+// Cut at the earliest match found after the start marker.
 const DESC_END_MARKERS = [
-  "À propos de l’entreprise",
-  "À propos de l'entreprise",
-  "About the company",
-  "Personnes que vous pouvez contacter",
-  "People you can contact",
-  "Rencontrez l’équipe",
-  "Rencontrez l'équipe",
-  "Meet the hiring team",
+  // French
   "Des recherches d’emploi plus rapides",
-  "Des recherches d'emploi plus rapides",
-  "Faster job searches",
+  "Des recherches d’emploi plus rapides",
   "Découvrez comment vous vous positionnez",
+  "Découvrez comment vous vous positionnez",
+  "À propos de l’entreprise",
+  "À propos de l’entreprise",
+  "Personnes que vous pouvez contacter",
+  "Rencontrez l’équipe",
+  "Rencontrez l’équipe",
+  "Rencontrez l’equipe",
+  "Voir plus d’offres",
+  "Voir plus d’offres",
+  "Essayer Premium",
+  "En savoir plus sur l’entreprise",
+  "En savoir plus sur l’entreprise",
+  // English
+  "Faster job searches",
   "See how you compare",
+  "About the company",
+  "People you can contact",
+  "Meet the hiring team",
+  "More jobs",
+  "Try Premium",
+  "Learn more about the company",
 ];
+
+// Standalone UI fragments to strip from extracted description text.
+const DESC_NOISE_LINES_RE = /^(plus|voir plus|show more|tout afficher|see more|afficher moins|show less)$/i;
 
 // Noise lines to skip when scanning bodyText for location
 const LOCATION_NOISE_RE = /^(Postuler|Apply now|Apply|Enregistrer|Save|Suivre|Follow|Se connecter|Connect|Message|Partager|Share|Signaler|Report|Promoted|Sponsorisé|\d+ candidat|\d+ applicant|Easy Apply|Candidature simplifiée)$/i;
@@ -303,73 +314,120 @@ function extractLocation(title, company) {
 }
 
 // ── Description ───────────────────────────────────────────────────────────────
-// Returns { value: string|null, source: string|null }
+// Returns { value, source, startMarker, endMarker, rawLength, cleanLength }
+// All fields may be null when nothing is found.
+
+function cleanDescription(raw) {
+  let text = raw
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')                 // collapse excess blank lines
+    .replace(/^[ \t]+|[ \t]+$/gm, '')            // trim each line's leading/trailing spaces
+    .replace(DESC_NOISE_LINES_RE, '')             // nuke standalone UI fragments (single line)
+    .split('\n')
+    .filter((line, i, arr) => {                  // remove redundant noise lines
+      if (!DESC_NOISE_LINES_RE.test(line.trim())) return true;
+      return false;
+    })
+    .join('\n');
+  text = text.replace(/\n{3,}/g, '\n\n').trim();
+  return text;
+}
+
+function sliceByEndMarkers(text) {
+  let endIdx = text.length;
+  let foundEnd = null;
+  for (const marker of DESC_END_MARKERS) {
+    const idx = text.indexOf(marker);
+    if (idx >= 0 && idx < endIdx) {
+      endIdx = idx;
+      foundEnd = marker;
+    }
+  }
+  return { sliced: text.slice(0, endIdx), endMarker: foundEnd };
+}
 
 function extractDescription() {
-  // 1. Specific DOM selectors
+  // 1. Specific DOM selectors — apply end-marker slicing so DOM results are also clean
   for (const sel of DESC_SELECTORS) {
     try {
       const el = document.querySelector(sel);
-      if (el) {
-        const text = (el.innerText || '').trim();
-        if (text.length > 80) return { value: text, source: 'selector' };
+      if (!el) continue;
+      const raw = (el.innerText || '').trim();
+      if (raw.length <= 80) continue;
+      const { sliced, endMarker } = sliceByEndMarkers(raw);
+      const clean = cleanDescription(sliced);
+      if (clean.length > 50) {
+        console.log('[RoleRadar:content] Description from selector:', sel, 'len:', clean.length);
+        return { value: clean.slice(0, 10000), source: 'selector',
+                 startMarker: sel, endMarker, rawLength: raw.length, cleanLength: clean.length };
       }
     } catch {}
   }
 
-  // 2. DOM: any element whose text exactly matches a start marker, then read context
+  // 2. DOM: element whose text exactly matches a start marker
   for (const marker of DESC_START_MARKERS) {
     for (const heading of document.querySelectorAll('h1,h2,h3,h4,h5,div,span')) {
       const ht = (heading.innerText || heading.textContent || '').trim();
       if (ht !== marker && !ht.startsWith(marker + '\n')) continue;
-      const parentText = heading.parentElement?.innerText?.trim();
-      if (parentText && parentText.length > 200) {
-        const cleaned = parentText.startsWith(marker)
-          ? parentText.slice(marker.length).trim()
-          : parentText;
-        if (cleaned.length > 80) {
-          console.log('[RoleRadar:content] Description from DOM section heading (parent)');
-          return { value: cleaned.slice(0, 10000), source: 'dom-section' };
+
+      // Try parent container first
+      const parentRaw = heading.parentElement?.innerText?.trim() || '';
+      if (parentRaw.length > 200) {
+        const stripped = parentRaw.startsWith(marker)
+          ? parentRaw.slice(marker.length).trimStart() : parentRaw;
+        const { sliced, endMarker } = sliceByEndMarkers(stripped);
+        const clean = cleanDescription(sliced);
+        if (clean.length > 80) {
+          console.log('[RoleRadar:content] Description from DOM section (parent), marker:', marker);
+          return { value: clean.slice(0, 10000), source: 'dom-section',
+                   startMarker: marker, endMarker, rawLength: stripped.length, cleanLength: clean.length };
         }
       }
+
+      // Try next siblings
       let sib = heading.nextElementSibling;
       while (sib) {
-        const st = sib.innerText?.trim();
-        if (st && st.length > 100) {
-          console.log('[RoleRadar:content] Description from DOM section heading (sibling)');
-          return { value: st.slice(0, 10000), source: 'dom-sibling' };
+        const sibRaw = sib.innerText?.trim() || '';
+        if (sibRaw.length > 100) {
+          const { sliced, endMarker } = sliceByEndMarkers(sibRaw);
+          const clean = cleanDescription(sliced);
+          if (clean.length > 50) {
+            console.log('[RoleRadar:content] Description from DOM section (sibling), marker:', marker);
+            return { value: clean.slice(0, 10000), source: 'dom-sibling',
+                     startMarker: marker, endMarker, rawLength: sibRaw.length, cleanLength: clean.length };
+          }
         }
         sib = sib.nextElementSibling;
       }
     }
   }
 
-  // 3. bodyText: extract text between start and end markers
+  // 3. bodyText: slice between start and end markers
   const bodyText = document.body?.innerText || '';
   let startIdx = -1;
   let startMarkerLen = 0;
+  let foundStart = null;
   for (const marker of DESC_START_MARKERS) {
     const idx = bodyText.indexOf(marker);
     if (idx >= 0 && (startIdx < 0 || idx < startIdx)) {
       startIdx = idx;
       startMarkerLen = marker.length;
+      foundStart = marker;
     }
   }
   if (startIdx >= 0) {
     const afterStart = bodyText.slice(startIdx + startMarkerLen).trimStart();
-    let endIdx = afterStart.length;
-    for (const endMarker of DESC_END_MARKERS) {
-      const idx = afterStart.indexOf(endMarker);
-      if (idx >= 0 && idx < endIdx) endIdx = idx;
-    }
-    const desc = afterStart.slice(0, endIdx).trim();
-    if (desc.length > 50) {
-      console.log('[RoleRadar:content] Description from bodyText section, len:', desc.length);
-      return { value: desc.slice(0, 10000), source: 'bodyText-section' };
+    const { sliced, endMarker } = sliceByEndMarkers(afterStart);
+    const clean = cleanDescription(sliced);
+    if (clean.length > 50) {
+      console.log('[RoleRadar:content] Description from bodyText section, start:', foundStart,
+                  'end:', endMarker, 'cleanLen:', clean.length);
+      return { value: clean.slice(0, 10000), source: 'bodyText-section',
+               startMarker: foundStart, endMarker, rawLength: sliced.length, cleanLength: clean.length };
     }
   }
 
-  // 4. Largest text block inside known detail panels
+  // 4. Largest text block inside known detail panels (last resort — no end-marker slicing)
   let bestText = '', bestLen = 0;
   for (const panelSel of DETAIL_PANEL_SELECTORS) {
     const panel = document.querySelector(panelSel);
@@ -385,11 +443,14 @@ function extractDescription() {
     if (bestText) break;
   }
   if (bestText) {
-    console.log('[RoleRadar:content] Description from largest detail-panel block, len:', bestLen);
-    return { value: bestText, source: 'panel-largest' };
+    const { sliced, endMarker } = sliceByEndMarkers(bestText);
+    const clean = cleanDescription(sliced);
+    console.log('[RoleRadar:content] Description from panel-largest, cleanLen:', clean.length);
+    return { value: clean.slice(0, 10000), source: 'panel-largest',
+             startMarker: null, endMarker, rawLength: bestText.length, cleanLength: clean.length };
   }
 
-  return { value: null, source: null };
+  return { value: null, source: null, startMarker: null, endMarker: null, rawLength: null, cleanLength: null };
 }
 
 // ── Truncation check ──────────────────────────────────────────────────────────
@@ -488,27 +549,34 @@ if (!window.__roleradarInjected) {
 
       const result = {
         jobId,
-        title:             titleRes.value,
-        titleSource:       titleRes.source,
-        company:           companyRes.value,
-        companySource:     companyRes.source,
-        location:          locationRes.value,
-        locationSource:    locationRes.source,
-        description:       descRes.value,
-        descriptionSource: descRes.source,
-        truncated:         isTruncated(),
+        title:                   titleRes.value,
+        titleSource:             titleRes.source,
+        company:                 companyRes.value,
+        companySource:           companyRes.source,
+        location:                locationRes.value,
+        locationSource:          locationRes.source,
+        description:             descRes.value,
+        descriptionSource:       descRes.source,
+        descriptionStartMarker:  descRes.startMarker,
+        descriptionEndMarker:    descRes.endMarker,
+        descriptionRawLength:    descRes.rawLength,
+        descriptionCleanLength:  descRes.cleanLength,
+        truncated:               isTruncated(),
       };
 
       console.log('[RoleRadar:content] Extract result:', {
         jobId,
-        title:             result.title?.slice(0, 50),
-        titleSource:       result.titleSource,
-        company:           result.company,
-        companySource:     result.companySource,
-        locationSource:    result.locationSource,
-        descriptionLength: result.description?.length ?? 0,
-        descriptionSource: result.descriptionSource,
-        truncated:         result.truncated,
+        title:                  result.title?.slice(0, 50),
+        titleSource:            result.titleSource,
+        company:                result.company,
+        companySource:          result.companySource,
+        locationSource:         result.locationSource,
+        descriptionSource:      result.descriptionSource,
+        descriptionStartMarker: result.descriptionStartMarker,
+        descriptionEndMarker:   result.descriptionEndMarker,
+        descriptionRawLength:   result.descriptionRawLength,
+        descriptionCleanLength: result.descriptionCleanLength,
+        truncated:              result.truncated,
       });
 
       sendResponse(result);

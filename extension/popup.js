@@ -29,6 +29,11 @@ const debugInfo = {
   locationSource:         null,
   descriptionLength:      null,
   descriptionSource:      null,
+  descriptionStartMarker: null,
+  descriptionEndMarker:   null,
+  descriptionRawLength:   null,
+  descriptionCleanLength: null,
+  descriptionNoise:       null,
   isTruncated:            null,
   lastError:              null,
 };
@@ -130,6 +135,11 @@ async function extractFromTab() {
   debugInfo.companySource          = null;
   debugInfo.locationSource         = null;
   debugInfo.descriptionSource      = null;
+  debugInfo.descriptionStartMarker = null;
+  debugInfo.descriptionEndMarker   = null;
+  debugInfo.descriptionRawLength   = null;
+  debugInfo.descriptionCleanLength = null;
+  debugInfo.descriptionNoise       = null;
   debugInfo.lastError              = null;
   renderDebugPanel();
 
@@ -218,9 +228,21 @@ async function extractFromTab() {
   debugInfo.companySource     = data.companySource     ?? null;
   debugInfo.location          = data.location ?? null;
   debugInfo.locationSource    = data.locationSource    ?? null;
-  debugInfo.descriptionLength = data.description?.length ?? 0;
-  debugInfo.descriptionSource = data.descriptionSource ?? null;
-  debugInfo.isTruncated       = data.truncated ?? null;
+  debugInfo.descriptionLength      = data.description?.length ?? 0;
+  debugInfo.descriptionSource      = data.descriptionSource      ?? null;
+  debugInfo.descriptionStartMarker = data.descriptionStartMarker ?? null;
+  debugInfo.descriptionEndMarker   = data.descriptionEndMarker   ?? null;
+  debugInfo.descriptionRawLength   = data.descriptionRawLength   ?? null;
+  debugInfo.descriptionCleanLength = data.descriptionCleanLength ?? null;
+  debugInfo.isTruncated            = data.truncated ?? null;
+
+  const NOISE_INDICATORS = [
+    'Premium', 'Personnes que vous pouvez contacter',
+    "À propos de l'entreprise", "À propos de l'entreprise",
+  ];
+  debugInfo.descriptionNoise = data.description
+    ? NOISE_INDICATORS.some(n => data.description.includes(n))
+    : null;
 
   const allEmpty    = !data.title && !data.company && !data.location && !data.description;
   const hasIdentity = !!(data.title || data.company);
@@ -230,6 +252,8 @@ async function extractFromTab() {
     debugInfo.lastError = 'Content script works, but LinkedIn DOM selectors found no job data.';
   } else if (hasIdentity && !hasDesc) {
     debugInfo.lastError = 'Description not found — expand "Show more" on LinkedIn then click ↺ Refresh.';
+  } else if (debugInfo.descriptionNoise) {
+    debugInfo.lastError = 'Warning: description may include LinkedIn noise (check descriptionEndMarker).';
   } else {
     debugInfo.lastError = null;
   }
@@ -421,6 +445,11 @@ function renderDebugPanel() {
     ['locationSource',         debugInfo.locationSource],
     ['descriptionLength',      debugInfo.descriptionLength],
     ['descriptionSource',      debugInfo.descriptionSource],
+    ['descriptionStartMarker', debugInfo.descriptionStartMarker],
+    ['descriptionEndMarker',   debugInfo.descriptionEndMarker],
+    ['descriptionRawLength',   debugInfo.descriptionRawLength],
+    ['descriptionCleanLength', debugInfo.descriptionCleanLength],
+    ['descriptionNoise',       debugInfo.descriptionNoise],
     ['isTruncated',            debugInfo.isTruncated],
     ['lastError',              debugInfo.lastError],
   ];
