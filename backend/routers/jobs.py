@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from backend.database import get_db
 from backend.models import Job, JobStatus
@@ -40,15 +40,24 @@ def create_job(payload: JobCreate, response: Response, db: Session = Depends(get
     return job
 
 
-@router.get("", response_model=List[JobResponse])
+@router.get("", response_model=List[JobDetailResponse])
 def list_jobs(
     status: Optional[JobStatus] = Query(default=None, description="Filter by status"),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Job)
+    q = db.query(Job).options(joinedload(Job.analyses))
     if status:
         q = q.filter(Job.status == status)
-    return q.order_by(Job.created_at.desc()).all()
+    jobs = q.order_by(Job.created_at.desc()).all()
+
+    result = []
+    for job in jobs:
+        latest = max(job.analyses, key=lambda a: a.created_at) if job.analyses else None
+        job_response = JobDetailResponse.model_validate(job)
+        if latest:
+            job_response.latest_analysis = FitAnalysisResponse.model_validate(latest)
+        result.append(job_response)
+    return result
 
 
 @router.get("/lookup", response_model=JobLookupResponse)

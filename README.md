@@ -12,7 +12,7 @@ Most job-search tools optimize for volume. RoleRadar AI optimizes for signal.
 
 The goal is a local decision assistant that tells you, honestly, which roles are worth your time — and which are not. It surfaces patterns (consulting traps, seniority mismatches, salary misalignment) and gives you structured prep guidance for the roles worth pursuing.
 
-Current milestone: **Backend MVP** — REST API only, no dashboard, no extension.
+Current milestone: **Dashboard MVP** — Kanban pipeline view, job detail panel, status updates.
 
 ---
 
@@ -190,6 +190,20 @@ If `AI_PROVIDER=openai` but `OPENAI_API_KEY` is missing, the `/analyze` endpoint
 
 ---
 
+## Running the dashboard
+
+Requires Node.js 18+. The FastAPI backend must be running first.
+
+```bash
+cd apps/dashboard
+npm install
+npm run dev
+```
+
+Dashboard is available at **http://localhost:5173**
+
+---
+
 ## Project structure
 
 ```
@@ -206,6 +220,21 @@ roleradar-ai/
 │   └── services/
 │       ├── dedup.py          # URL + title/company fingerprinting
 │       └── analyzer.py       # MockAnalyzer, OpenAIAnalyzer, get_analyzer()
+├── apps/
+│   └── dashboard/            # React + Vite local dashboard
+│       ├── src/
+│       │   ├── App.tsx
+│       │   ├── api.ts
+│       │   ├── types.ts
+│       │   ├── styles.css
+│       │   └── components/
+│       │       ├── Board.tsx
+│       │       ├── Column.tsx
+│       │       ├── JobCard.tsx
+│       │       ├── DetailPanel.tsx
+│       │       └── StatsRow.tsx
+│       └── package.json
+├── extension/                # Chrome extension (MV3)
 ├── requirements.txt
 ├── .env.example
 └── README.md
