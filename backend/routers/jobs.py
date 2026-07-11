@@ -11,6 +11,13 @@ from backend.services.dedup import find_duplicate
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
+def _latest_analysis(job: Job) -> Optional[FitAnalysisResponse]:
+    if not job.analyses:
+        return None
+    latest = max(job.analyses, key=lambda a: a.created_at)
+    return FitAnalysisResponse.model_validate(latest)
+
+
 @router.post("", response_model=JobResponse)
 def create_job(payload: JobCreate, response: Response, db: Session = Depends(get_db)):
     existing = find_duplicate(db, payload.url, payload.title, payload.company)
@@ -52,10 +59,8 @@ def list_jobs(
 
     result = []
     for job in jobs:
-        latest = max(job.analyses, key=lambda a: a.created_at) if job.analyses else None
         job_response = JobDetailResponse.model_validate(job)
-        if latest:
-            job_response.latest_analysis = FitAnalysisResponse.model_validate(latest)
+        job_response.latest_analysis = _latest_analysis(job)
         result.append(job_response)
     return result
 
@@ -66,13 +71,8 @@ def lookup_job(url: str = Query(..., description="Exact job URL"), db: Session =
     if not job:
         return JobLookupResponse(found=False)
 
-    latest = None
-    if job.analyses:
-        latest = max(job.analyses, key=lambda a: a.created_at)
-
     job_response = JobDetailResponse.model_validate(job)
-    if latest:
-        job_response.latest_analysis = FitAnalysisResponse.model_validate(latest)
+    job_response.latest_analysis = _latest_analysis(job)
     return JobLookupResponse(found=True, job=job_response)
 
 
@@ -82,13 +82,8 @@ def get_job(job_id: int, db: Session = Depends(get_db)):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    latest = None
-    if job.analyses:
-        latest = max(job.analyses, key=lambda a: a.created_at)
-
     result = JobDetailResponse.model_validate(job)
-    if latest:
-        result.latest_analysis = FitAnalysisResponse.model_validate(latest)
+    result.latest_analysis = _latest_analysis(job)
     return result
 
 

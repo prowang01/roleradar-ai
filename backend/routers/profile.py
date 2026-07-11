@@ -10,23 +10,25 @@ from backend.schemas import UserProfileUpdate, UserProfileResponse
 router = APIRouter(prefix="/profile", tags=["profile"])
 
 
-@router.get("", response_model=UserProfileResponse)
-def get_profile(db: Session = Depends(get_db)):
+def _get_or_create_profile(db: Session) -> UserProfile:
     profile = db.query(UserProfile).first()
     if not profile:
         profile = UserProfile(id=1)
         db.add(profile)
-        db.commit()
-        db.refresh(profile)
+    return profile
+
+
+@router.get("", response_model=UserProfileResponse)
+def get_profile(db: Session = Depends(get_db)):
+    profile = _get_or_create_profile(db)
+    db.commit()
+    db.refresh(profile)
     return profile
 
 
 @router.put("", response_model=UserProfileResponse)
 def update_profile(payload: UserProfileUpdate, db: Session = Depends(get_db)):
-    profile = db.query(UserProfile).first()
-    if not profile:
-        profile = UserProfile(id=1)
-        db.add(profile)
+    profile = _get_or_create_profile(db)
 
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(profile, key, value)
@@ -48,11 +50,7 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
     except Exception:
         raise HTTPException(status_code=422, detail="Could not parse PDF. Try a different file.")
 
-    profile = db.query(UserProfile).first()
-    if not profile:
-        profile = UserProfile(id=1)
-        db.add(profile)
-
+    profile = _get_or_create_profile(db)
     profile.resume_text = resume_text.strip() or None
     db.commit()
     db.refresh(profile)

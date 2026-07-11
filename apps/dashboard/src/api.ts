@@ -31,9 +31,12 @@ export async function patchJobNotes(id: number, notes: string): Promise<Job> {
 export async function analyzeJob(jobId: number): Promise<FitAnalysis> {
   const res = await fetch(`${API}/jobs/${jobId}/analyze`, { method: 'POST' })
   if (!res.ok) {
-    if (res.status === 400) throw new Error('PROVIDER_NOT_CONFIGURED')
     const body = await res.json().catch(() => ({}))
-    throw new Error(body?.detail ?? `POST /jobs/${jobId}/analyze failed: ${res.status}`)
+    const detail: string = body?.detail ?? ''
+    if (res.status === 400 && /openai|api.?key|ai.?provider/i.test(detail)) {
+      throw new Error('PROVIDER_NOT_CONFIGURED')
+    }
+    throw new Error(detail || `POST /jobs/${jobId}/analyze failed: ${res.status}`)
   }
   return res.json()
 }
@@ -57,9 +60,12 @@ export async function updateProfile(data: UserProfileUpdate): Promise<UserProfil
 export async function generateJobBrief(jobId: number): Promise<JobBrief> {
   const res = await fetch(`${API}/jobs/${jobId}/brief`, { method: 'POST' })
   if (!res.ok) {
-    if (res.status === 400) throw new Error('PROVIDER_NOT_CONFIGURED')
     const body = await res.json().catch(() => ({}))
-    throw new Error(body?.detail ?? `POST /jobs/${jobId}/brief failed: ${res.status}`)
+    const detail: string = body?.detail ?? ''
+    if (res.status === 400 && /openai|api.?key|ai.?provider/i.test(detail)) {
+      throw new Error('PROVIDER_NOT_CONFIGURED')
+    }
+    throw new Error(detail || `POST /jobs/${jobId}/brief failed: ${res.status}`)
   }
   return res.json()
 }

@@ -2,6 +2,7 @@
 // Each popup open is a fresh JS context — no state persists between opens.
 
 const API = 'http://localhost:8000';
+const DASHBOARD_URL = 'http://localhost:5173';
 
 // ── Runtime state ────────────────────────────────────────────────────────────
 
@@ -482,16 +483,6 @@ async function patchStatus(jobId, status) {
   if (!res.ok) throw new Error(`PATCH /jobs/${jobId} failed (${res.status})`);
 }
 
-async function refreshJobFromBackend(jobId) {
-  try {
-    const res = await fetch(`${API}/jobs/${jobId}`);
-    if (res.ok) {
-      state.backendJob = await res.json();
-      console.log('[RoleRadar] Refreshed job from backend:', jobId);
-    }
-  } catch {}
-}
-
 // ── Analysis card ─────────────────────────────────────────────────────────────
 
 function renderAnalysisSummary(analysis) {
@@ -642,14 +633,12 @@ function fmtVerdict(v) {
 // ── Navigation handlers ───────────────────────────────────────────────────────
 
 function onOpenDashboard() {
-  chrome.tabs.create({ url: 'http://localhost:5173' });
+  chrome.tabs.create({ url: DASHBOARD_URL });
 }
 
 function onViewDetails() {
   const jobId = state.backendJob?.id
-  const url = jobId
-    ? `http://localhost:5173/?jobId=${jobId}`
-    : 'http://localhost:5173'
+  const url = jobId ? `${DASHBOARD_URL}/?jobId=${jobId}` : DASHBOARD_URL
   chrome.tabs.create({ url })
 }
 
