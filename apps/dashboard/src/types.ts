@@ -83,3 +83,37 @@ export const WRITABLE_STATUSES: { value: WritableStatus; label: string }[] = [
   { value: 'interview', label: 'Interview' },
   { value: 'archived',  label: 'Archived' },
 ]
+
+export interface UserProfile {
+  id: number
+  target_roles: string[]
+  target_contract: string | null
+  preferred_locations: string[]
+  minimum_salary_eur: number | null
+  happy_salary_eur: number | null
+  strategy: string | null
+  preferred_stacks: string[]
+  target_keywords: string[]
+  avoid_keywords: string[]
+  current_experience_summary: string | null
+  career_goals: string | null
+  red_flags: string[]
+  decision_style: string | null
+  updated_at: string | null
+}
+
+export interface UserProfileUpdate {
+  target_roles?: string[]
+  target_contract?: string | null
+  preferred_locations?: string[]
+  minimum_salary_eur?: number | null
+  happy_salary_eur?: number | null
+  strategy?: string | null
+  preferred_stacks?: string[]
+  target_keywords?: string[]
+  avoid_keywords?: string[]
+  current_experience_summary?: string | null
+  career_goals?: string | null
+  red_flags?: string[]
+  decision_style?: string | null
+}

@@ -4,6 +4,7 @@ import { listJobs, patchJobStatus } from './api'
 import StatsRow from './components/StatsRow'
 import Board from './components/Board'
 import DetailPanel from './components/DetailPanel'
+import ProfileModal from './components/ProfileModal'
 
 export default function App() {
   const [jobs, setJobs] = useState<Job[]>([])
@@ -12,6 +13,7 @@ export default function App() {
   const [updateError, setUpdateError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [showProfile, setShowProfile] = useState(false)
 
   const fetchJobs = useCallback(async () => {
     setLoading(true)
@@ -73,6 +75,13 @@ export default function App() {
             onChange={e => setQuery(e.target.value)}
           />
           <button
+            className="btn-profile"
+            onClick={() => setShowProfile(true)}
+            title="Edit career profile"
+          >
+            Profile
+          </button>
+          <button
             className="btn-refresh"
             onClick={fetchJobs}
             disabled={loading}
@@ -103,6 +112,10 @@ export default function App() {
           selectedId={selectedId}
           onStatusChange={handleStatusChange}
         />
+      )}
+
+      {showProfile && (
+        <ProfileModal onClose={() => setShowProfile(false)} />
       )}
 
       {selectedJob && (
