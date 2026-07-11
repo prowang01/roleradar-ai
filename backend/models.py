@@ -76,6 +76,7 @@ class UserProfile(Base):
     career_goals = Column(Text, nullable=True)
     red_flags = Column(JSON, nullable=False, default=list)
     decision_style = Column(String, nullable=True)
+    resume_text = Column(Text, nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=True, default=_now, onupdate=_now)
 
 

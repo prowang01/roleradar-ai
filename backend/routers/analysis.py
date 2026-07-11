@@ -30,6 +30,7 @@ def analyze_job(job_id: int, db: Session = Depends(get_db)):
             "avoid_keywords": profile.avoid_keywords or [],
             "red_flags": profile.red_flags or [],
             "strategy": profile.strategy,
+            "resume_text": profile.resume_text,
         }
 
     job_data = {

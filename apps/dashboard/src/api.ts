@@ -53,3 +53,14 @@ export async function updateProfile(data: UserProfileUpdate): Promise<UserProfil
   if (!res.ok) throw new Error(`PUT /profile failed: ${res.status}`)
   return res.json()
 }
+
+export async function uploadResume(file: File): Promise<UserProfile> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`${API}/profile/resume`, { method: 'POST', body: form })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.detail ?? `POST /profile/resume failed: ${res.status}`)
+  }
+  return res.json()
+}

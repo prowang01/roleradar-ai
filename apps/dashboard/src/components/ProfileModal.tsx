@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import type { UserProfile, UserProfileUpdate } from '../types'
-import { getProfile, updateProfile } from '../api'
+import { getProfile, updateProfile, uploadResume } from '../api'
 
 interface Props {
   onClose: () => void
@@ -94,18 +94,23 @@ function isProfileEmpty(p: UserProfile): boolean {
 }
 
 export default function ProfileModal({ onClose }: Props) {
-  const [loading,   setLoading]   = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [draft,     setDraft]     = useState<Draft>(EMPTY_DRAFT)
-  const [empty,     setEmpty]     = useState(false)
-  const [saving,    setSaving]    = useState(false)
-  const [saveMsg,   setSaveMsg]   = useState<'saved' | 'error' | null>(null)
+  const [loading,         setLoading]         = useState(true)
+  const [loadError,       setLoadError]       = useState<string | null>(null)
+  const [draft,           setDraft]           = useState<Draft>(EMPTY_DRAFT)
+  const [empty,           setEmpty]           = useState(false)
+  const [saving,          setSaving]          = useState(false)
+  const [saveMsg,         setSaveMsg]         = useState<'saved' | 'error' | null>(null)
+  const [resumeFile,      setResumeFile]      = useState<File | null>(null)
+  const [resumeHasText,   setResumeHasText]   = useState(false)
+  const [resumeUploading, setResumeUploading] = useState(false)
+  const [resumeMsg,       setResumeMsg]       = useState<'uploaded' | 'error' | null>(null)
 
   useEffect(() => {
     getProfile()
       .then(p => {
         setDraft(profileToDraft(p))
         setEmpty(isProfileEmpty(p))
+        setResumeHasText(Boolean(p.resume_text))
       })
       .catch(() => setLoadError('Could not load profile. Is the backend running on localhost:8000?'))
       .finally(() => setLoading(false))
@@ -122,6 +127,22 @@ export default function ProfileModal({ onClose }: Props) {
   function field(key: keyof Draft) {
     return (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setDraft(prev => ({ ...prev, [key]: e.target.value }))
+  }
+
+  async function handleResumeUpload() {
+    if (!resumeFile) return
+    setResumeUploading(true)
+    setResumeMsg(null)
+    try {
+      await uploadResume(resumeFile)
+      setResumeHasText(true)
+      setResumeMsg('uploaded')
+      setTimeout(() => setResumeMsg(null), 2500)
+    } catch {
+      setResumeMsg('error')
+    } finally {
+      setResumeUploading(false)
+    }
   }
 
   async function handleSave() {
@@ -168,6 +189,38 @@ export default function ProfileModal({ onClose }: Props) {
                   Your profile is empty. Configure it so AI analysis can judge jobs against your actual goals.
                 </div>
               )}
+
+              {/* Resume */}
+              <section className="panel-section">
+                <label className="panel-label">
+                  Resume / CV
+                  {resumeHasText && <span className="resume-status-tag">Uploaded</span>}
+                </label>
+                <div className="profile-field">
+                  <div className="resume-upload-row">
+                    <input
+                      className="resume-upload-input"
+                      type="file"
+                      accept=".pdf"
+                      onChange={e => setResumeFile(e.target.files?.[0] ?? null)}
+                    />
+                    <button
+                      className="btn-upload-resume"
+                      onClick={handleResumeUpload}
+                      disabled={!resumeFile || resumeUploading}
+                    >
+                      {resumeUploading ? 'Uploading…' : 'Upload PDF'}
+                    </button>
+                  </div>
+                  {resumeMsg === 'uploaded' && (
+                    <span className="resume-msg resume-msg-ok">Resume uploaded — AI analysis will use it.</span>
+                  )}
+                  {resumeMsg === 'error' && (
+                    <span className="resume-msg resume-msg-err">Upload failed — check the backend or try a different PDF.</span>
+                  )}
+                  <span className="profile-hint">PDF only. Extracted text is sent to AI analysis as evidence of your experience.</span>
+                </div>
+              </section>
 
               {/* Target Roles */}
               <section className="panel-section">

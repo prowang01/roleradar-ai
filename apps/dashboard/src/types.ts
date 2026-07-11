@@ -100,6 +100,7 @@ export interface UserProfile {
   career_goals: string | null
   red_flags: string[]
   decision_style: string | null
+  resume_text: string | null
   updated_at: string | null
 }
 

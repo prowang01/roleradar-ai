@@ -5,13 +5,23 @@ load_dotenv()  # Must run before any backend imports that read os.getenv at modu
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from backend.database import engine, Base
 from backend.routers import jobs, analysis, profile
+
+
+def _run_migrations() -> None:
+    with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(user_profiles)"))}
+        if "resume_text" not in cols:
+            conn.execute(text("ALTER TABLE user_profiles ADD COLUMN resume_text TEXT"))
+            conn.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
     yield
 
 

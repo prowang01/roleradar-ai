@@ -106,6 +106,7 @@ class UserProfileUpdate(BaseModel):
     career_goals: Optional[str] = None
     red_flags: Optional[List[str]] = None
     decision_style: Optional[str] = None
+    resume_text: Optional[str] = None
 
 
 class UserProfileResponse(BaseModel):
@@ -125,4 +126,5 @@ class UserProfileResponse(BaseModel):
     career_goals: Optional[str] = None
     red_flags: List[str] = []
     decision_style: Optional[str] = None
+    resume_text: Optional[str] = None
     updated_at: Optional[datetime] = None

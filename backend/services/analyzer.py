@@ -227,6 +227,10 @@ Required fields:
 }
 
 
+RESUME / CV:
+If a RESUME / CV section is included below, treat it as the primary factual evidence of the candidate's experience. Use it to sharpen candidate_fit and missing_skills. Never contradict what the resume explicitly states about skills or experience.
+
+
 CORE PRINCIPLE:
 fit_score answers: "Is this job worth applying to for this specific user?"
 It measures desirability × candidate fit × conversion likelihood × career upside, relative to opportunity cost.
@@ -469,6 +473,8 @@ class OpenAIAnalyzer(BaseAnalyzer):
                 f"  Red flags: {', '.join(profile_data.get('red_flags') or ['None'])}",
                 f"  Strategy: {profile_data.get('strategy') or 'Not specified'}",
             ]
+            if profile_data.get("resume_text"):
+                lines += ["", "RESUME / CV:", profile_data["resume_text"]]
         return "\n".join(lines)
 
 
