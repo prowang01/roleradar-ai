@@ -15,12 +15,13 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [showProfile, setShowProfile] = useState(false)
 
-  const fetchJobs = useCallback(async () => {
+  const fetchJobs = useCallback(async (): Promise<Job[]> => {
     setLoading(true)
     setError(null)
     try {
       const data = await listJobs()
       setJobs(data)
+      return data
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       const isOffline = msg.includes('Failed to fetch') || msg.includes('NetworkError')
@@ -29,12 +30,24 @@ export default function App() {
           ? 'Backend offline. Start FastAPI on localhost:8000.'
           : `Error loading jobs: ${msg}`
       )
+      return []
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { fetchJobs() }, [fetchJobs])
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const jobIdParam = params.get('jobId')
+
+    fetchJobs().then(data => {
+      if (!jobIdParam) return
+      const id = parseInt(jobIdParam, 10)
+      if (!isNaN(id) && data.some(j => j.id === id)) {
+        setSelectedId(id)
+      }
+    })
+  }, [fetchJobs])
 
   // Used by both the status dropdown in DetailPanel and drag-and-drop.
   // Optimistic update first; reverts and surfaces an error if PATCH fails.

@@ -168,6 +168,13 @@ function onToggleDebug() {
 // Debug Extract. Updates debugInfo at every intermediate step.
 
 async function extractFromTab() {
+  // Guard: only attempt extraction on LinkedIn job pages.
+  if (!state.url || !state.url.includes('linkedin.com/jobs/')) {
+    setExtractMsg('error', 'Open a LinkedIn job page to use RoleRadar.');
+    setActionButtons(false);
+    return;
+  }
+
   setExtractMsg('loading', 'Extracting job…');
   clearWarning();
 
@@ -201,9 +208,7 @@ async function extractFromTab() {
     console.log('[RoleRadar] Content script was already available (declarative injection)');
   } catch (firstErr) {
     debugInfo.contentScriptAvailable = false;
-    debugInfo.lastError = firstErr.message;
     renderDebugPanel();
-    console.warn('[RoleRadar] sendMessage failed:', firstErr.message);
 
     const isNoReceiver =
       firstErr.message?.includes('Could not establish connection') ||
@@ -212,16 +217,19 @@ async function extractFromTab() {
     if (!isNoReceiver) {
       // Unexpected error — not a missing-script problem.
       debugInfo.extractSucceeded = false;
+      debugInfo.lastError = firstErr.message;
       renderDebugPanel();
+      console.warn('[RoleRadar] sendMessage unexpected error:', firstErr.message);
       setExtractMsg('error', 'sendMessage error: ' + firstErr.message);
       return;
     }
 
-    // ── Attempt 2: inject content.js, then retry ─────────────────────────
+    // Expected: content script not yet running. Try programmatic injection.
+    console.log('[RoleRadar] Content script not ready — injecting programmatically');
     debugInfo.injectionAttempted = true;
     renderDebugPanel();
-    console.log('[RoleRadar] Content script not found — injecting programmatically');
 
+    // ── Attempt 2a: inject content.js ────────────────────────────────────
     try {
       await chrome.scripting.executeScript({
         target: { tabId: state.tabId },
@@ -229,19 +237,29 @@ async function extractFromTab() {
       });
       usedInjection = true;
       debugInfo.injectionSucceeded = true;
-      debugInfo.lastError = null; // injection succeeded — clear the previous sendMessage error
       renderDebugPanel();
       console.log('[RoleRadar] Injection successful — retrying sendMessage');
-
-      data = await chrome.tabs.sendMessage(state.tabId, { action: 'extract' });
     } catch (injectErr) {
       debugInfo.injectionSucceeded = false;
       debugInfo.extractSucceeded   = false;
       debugInfo.lastError          = injectErr.message;
       renderDebugPanel();
-      console.error('[RoleRadar] Injection failed:', injectErr.message);
-      showWarning('Could not access this LinkedIn job page. Reload the tab and try again.');
-      setExtractMsg('error', 'Injection failed: ' + injectErr.message);
+      console.warn('[RoleRadar] Injection failed:', injectErr.message);
+      showWarning('Content script not available. Reload the LinkedIn job tab and try again.');
+      setExtractMsg('error', 'Content script not available — reload the tab.');
+      return;
+    }
+
+    // ── Attempt 2b: retry sendMessage after injection ─────────────────────
+    try {
+      data = await chrome.tabs.sendMessage(state.tabId, { action: 'extract' });
+    } catch (retryErr) {
+      debugInfo.extractSucceeded = false;
+      debugInfo.lastError        = retryErr.message;
+      renderDebugPanel();
+      console.warn('[RoleRadar] sendMessage retry failed after injection:', retryErr.message);
+      showWarning('Content script not available. Reload the LinkedIn job tab and try again.');
+      setExtractMsg('error', 'Content script not responding — reload the tab.');
       return;
     }
   }
@@ -628,7 +646,11 @@ function onOpenDashboard() {
 }
 
 function onViewDetails() {
-  chrome.tabs.create({ url: 'http://localhost:5173' });
+  const jobId = state.backendJob?.id
+  const url = jobId
+    ? `http://localhost:5173/?jobId=${jobId}`
+    : 'http://localhost:5173'
+  chrome.tabs.create({ url })
 }
 
 // ── Action button handlers ────────────────────────────────────────────────────
