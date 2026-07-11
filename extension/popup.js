@@ -38,31 +38,65 @@ const debugInfo = {
   lastError:              null,
 };
 
+// ── Verdict display config ────────────────────────────────────────────────────
+
+const VERDICT_LABELS = {
+  strong_apply:     'Strong Apply',
+  apply:            'Apply',
+  apply_as_stretch: 'Stretch Apply',
+  apply_only_if:    'Apply If',
+  maybe:            'Maybe',
+  skip:             'Skip',
+  hard_skip:        'Hard Skip',
+};
+
+const VERDICT_COLORS = {
+  strong_apply:     { bg: '#dcfce7', color: '#166534' },
+  apply:            { bg: '#dbeafe', color: '#1e40af' },
+  apply_as_stretch: { bg: '#eef2ff', color: '#4338ca' },
+  apply_only_if:    { bg: '#fef3c7', color: '#92400e' },
+  maybe:            { bg: '#f1f5f9', color: '#374151' },
+  skip:             { bg: '#fee2e2', color: '#991b1b' },
+  hard_skip:        { bg: '#ffe4e6', color: '#9f1239' },
+};
+
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 
 let elBadge, elWarning, elExtractMsg, elStatusMsg, elDebugRows;
 let elTitle, elCompany, elLocation, elDesc;
 let btnRefresh, btnSave, btnApplied, btnAnalyze, btnDebugExtract;
 let btnCopyDom, elDomDebugStatus, elDomDebugOut;
+let elAnalysisCard, elAcVerdictBadge, elAcScore, elAcAction, elAcSummary;
+let elDebugWrapper, btnToggleDebug, btnOpenDashboard, btnViewDetails;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  elBadge         = document.getElementById('badge');
-  elWarning       = document.getElementById('warning');
-  elExtractMsg    = document.getElementById('extract-msg');
-  elStatusMsg     = document.getElementById('status-msg');
-  elDebugRows     = document.getElementById('debug-rows');
-  elTitle         = document.getElementById('f-title');
-  elCompany       = document.getElementById('f-company');
-  elLocation      = document.getElementById('f-location');
-  elDesc          = document.getElementById('f-desc');
-  btnRefresh      = document.getElementById('btn-refresh');
-  btnSave         = document.getElementById('btn-save');
-  btnApplied      = document.getElementById('btn-applied');
-  btnAnalyze      = document.getElementById('btn-analyze');
-  btnDebugExtract = document.getElementById('btn-debug-extract');
-  btnCopyDom      = document.getElementById('btn-copy-dom');
+  elBadge          = document.getElementById('badge');
+  elWarning        = document.getElementById('warning');
+  elExtractMsg     = document.getElementById('extract-msg');
+  elStatusMsg      = document.getElementById('status-msg');
+  elDebugRows      = document.getElementById('debug-rows');
+  elTitle          = document.getElementById('f-title');
+  elCompany        = document.getElementById('f-company');
+  elLocation       = document.getElementById('f-location');
+  elDesc           = document.getElementById('f-desc');
+  btnRefresh       = document.getElementById('btn-refresh');
+  btnSave          = document.getElementById('btn-save');
+  btnApplied       = document.getElementById('btn-applied');
+  btnAnalyze       = document.getElementById('btn-analyze');
+  btnDebugExtract  = document.getElementById('btn-debug-extract');
+  btnCopyDom       = document.getElementById('btn-copy-dom');
   elDomDebugStatus = document.getElementById('dom-debug-status');
   elDomDebugOut    = document.getElementById('dom-debug-out');
+
+  elAnalysisCard   = document.getElementById('analysis-card');
+  elAcVerdictBadge = document.getElementById('ac-verdict-badge');
+  elAcScore        = document.getElementById('ac-score');
+  elAcAction       = document.getElementById('ac-action');
+  elAcSummary      = document.getElementById('ac-summary');
+  elDebugWrapper   = document.getElementById('debug-wrapper');
+  btnToggleDebug   = document.getElementById('btn-toggle-debug');
+  btnOpenDashboard = document.getElementById('btn-open-dashboard');
+  btnViewDetails   = document.getElementById('btn-view-details');
 
   btnRefresh.addEventListener('click', onRefresh);
   btnSave.addEventListener('click', onSave);
@@ -70,6 +104,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnAnalyze.addEventListener('click', onAnalyze);
   btnDebugExtract.addEventListener('click', onDebugExtract);
   btnCopyDom.addEventListener('click', onCopyDom);
+  btnToggleDebug.addEventListener('click', onToggleDebug);
+  btnOpenDashboard.addEventListener('click', onOpenDashboard);
+  btnViewDetails.addEventListener('click', onViewDetails);
 
   renderDebugPanel(); // show initial —/— state
   await init();
@@ -116,6 +153,14 @@ async function init() {
 function isJobPage(url) {
   if (!url) return false;
   return url.includes('linkedin.com/jobs/');
+}
+
+// ── Debug toggle ──────────────────────────────────────────────────────────────
+
+function onToggleDebug() {
+  const isOpen = elDebugWrapper.style.display !== 'none';
+  elDebugWrapper.style.display = isOpen ? 'none' : 'block';
+  btnToggleDebug.textContent   = isOpen ? 'Show debug ▾' : 'Hide debug ▴';
 }
 
 // ── Extraction ────────────────────────────────────────────────────────────────
@@ -238,7 +283,7 @@ async function extractFromTab() {
 
   const NOISE_INDICATORS = [
     'Premium', 'Personnes que vous pouvez contacter',
-    "À propos de l'entreprise", "À propos de l'entreprise",
+    "À propos de l'entreprise",
   ];
   debugInfo.descriptionNoise = data.description
     ? NOISE_INDICATORS.some(n => data.description.includes(n))
@@ -370,6 +415,11 @@ async function lookupBackend() {
     const data = await res.json();
     state.backendJob = data.found ? data.job : null;
     console.log('[RoleRadar] Lookup result: found =', data.found, 'id =', data.job?.id ?? null);
+
+    // Show existing analysis immediately if the job was already analyzed
+    if (state.backendJob?.latest_analysis) {
+      renderAnalysisSummary(state.backendJob.latest_analysis);
+    }
   } catch (err) {
     console.warn('[RoleRadar] Lookup failed (backend offline?):', err.message);
     showWarning('Backend not reachable — start uvicorn on localhost:8000 first.');
@@ -422,6 +472,42 @@ async function refreshJobFromBackend(jobId) {
       console.log('[RoleRadar] Refreshed job from backend:', jobId);
     }
   } catch {}
+}
+
+// ── Analysis card ─────────────────────────────────────────────────────────────
+
+function renderAnalysisSummary(analysis) {
+  if (!analysis) {
+    elAnalysisCard.style.display = 'none';
+    return;
+  }
+
+  const label  = VERDICT_LABELS[analysis.verdict] || fmtVerdict(analysis.verdict);
+  const colors = VERDICT_COLORS[analysis.verdict] || { bg: '#f1f5f9', color: '#374151' };
+
+  elAcVerdictBadge.textContent      = label;
+  elAcVerdictBadge.style.background = colors.bg;
+  elAcVerdictBadge.style.color      = colors.color;
+
+  const scoreNum = typeof analysis.fit_score === 'number'
+    ? analysis.fit_score.toFixed(1) : '—';
+  elAcScore.innerHTML = `${scoreNum}<span class="ac-score-denom">/10</span>`;
+
+  if (analysis.recommended_action) {
+    elAcAction.textContent   = analysis.recommended_action;
+    elAcAction.style.display = 'block';
+  } else {
+    elAcAction.style.display = 'none';
+  }
+
+  if (analysis.why) {
+    elAcSummary.textContent   = analysis.why;
+    elAcSummary.style.display = 'block';
+  } else {
+    elAcSummary.style.display = 'none';
+  }
+
+  elAnalysisCard.style.display = 'block';
 }
 
 // ── Debug panel ───────────────────────────────────────────────────────────────
@@ -484,11 +570,9 @@ function esc(s) {
 
 function refreshBadge() {
   if (!state.backendJob) { setBadge('New', 'new'); return; }
-  const { status, latest_analysis } = state.backendJob;
-  setBadge(
-    latest_analysis ? `${cap(status)} · Analyzed` : cap(status),
-    latest_analysis ? 'analyzed' : status
-  );
+  // Applied is the strongest status — show it cleanly without "Analyzed" suffix.
+  // Analysis is shown in the analysis card, not the badge.
+  setBadge(cap(state.backendJob.status), state.backendJob.status);
 }
 
 function setBadge(text, cls) {
@@ -537,6 +621,16 @@ function fmtVerdict(v) {
   return v ? v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : v;
 }
 
+// ── Navigation handlers ───────────────────────────────────────────────────────
+
+function onOpenDashboard() {
+  chrome.tabs.create({ url: 'http://localhost:5173' });
+}
+
+function onViewDetails() {
+  chrome.tabs.create({ url: 'http://localhost:5173' });
+}
+
 // ── Action button handlers ────────────────────────────────────────────────────
 
 async function onSave() {
@@ -581,17 +675,23 @@ async function onAnalyze() {
     const res = await fetch(`${API}/jobs/${job.id}/analyze`, { method: 'POST' });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Analysis failed (${res.status})`);
+      const detail = err.detail || '';
+      if (res.status === 400) {
+        const isNoKey = detail.includes('OPENAI_API_KEY') || detail.includes('AI_PROVIDER') || detail.includes('missing');
+        throw new Error(isNoKey
+          ? 'AI provider not configured — add OPENAI_API_KEY to .env and restart the backend.'
+          : detail || 'Analysis request rejected (400)');
+      }
+      throw new Error(detail || `Analysis failed (${res.status})`);
     }
+
     const analysis = await res.json();
     console.log('[RoleRadar] Analysis done:', { verdict: analysis.verdict, fit_score: analysis.fit_score });
 
-    await refreshJobFromBackend(job.id);
+    state.backendJob = { ...(state.backendJob || {}), latest_analysis: analysis };
     refreshBadge();
-
-    const score = typeof analysis.fit_score === 'number'
-      ? ` · ${analysis.fit_score.toFixed(1)}/10` : '';
-    setActionMsg('success', `${fmtVerdict(analysis.verdict)}${score}`);
+    renderAnalysisSummary(analysis);
+    setActionMsg('', ''); // clear "Analyzing..." — result is in the card
   } catch (e) {
     setActionMsg('error', e.message);
   } finally {

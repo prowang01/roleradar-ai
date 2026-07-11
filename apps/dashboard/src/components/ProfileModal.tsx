@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ChangeEvent } from 'react'
 import type { UserProfile, UserProfileUpdate } from '../types'
 import { getProfile, updateProfile, uploadResume } from '../api'
@@ -102,8 +102,10 @@ export default function ProfileModal({ onClose }: Props) {
   const [saveMsg,         setSaveMsg]         = useState<'saved' | 'error' | null>(null)
   const [resumeFile,      setResumeFile]      = useState<File | null>(null)
   const [resumeHasText,   setResumeHasText]   = useState(false)
+  const [resumeCharCount, setResumeCharCount] = useState(0)
   const [resumeUploading, setResumeUploading] = useState(false)
   const [resumeMsg,       setResumeMsg]       = useState<'uploaded' | 'error' | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     getProfile()
@@ -111,6 +113,7 @@ export default function ProfileModal({ onClose }: Props) {
         setDraft(profileToDraft(p))
         setEmpty(isProfileEmpty(p))
         setResumeHasText(Boolean(p.resume_text))
+        setResumeCharCount(p.resume_text?.length ?? 0)
       })
       .catch(() => setLoadError('Could not load profile. Is the backend running on localhost:8000?'))
       .finally(() => setLoading(false))
@@ -129,15 +132,25 @@ export default function ProfileModal({ onClose }: Props) {
       setDraft(prev => ({ ...prev, [key]: e.target.value }))
   }
 
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null
+    if (file && !file.name.toLowerCase().endsWith('.pdf')) return
+    setResumeFile(file)
+    setResumeMsg(null)
+  }
+
   async function handleResumeUpload() {
     if (!resumeFile) return
     setResumeUploading(true)
     setResumeMsg(null)
     try {
-      await uploadResume(resumeFile)
+      const updated = await uploadResume(resumeFile)
       setResumeHasText(true)
+      setResumeCharCount(updated.resume_text?.length ?? 0)
+      setResumeFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
       setResumeMsg('uploaded')
-      setTimeout(() => setResumeMsg(null), 2500)
+      setTimeout(() => setResumeMsg(null), 3000)
     } catch {
       setResumeMsg('error')
     } finally {
@@ -192,32 +205,62 @@ export default function ProfileModal({ onClose }: Props) {
 
               {/* Resume */}
               <section className="panel-section">
-                <label className="panel-label">
-                  Resume / CV
-                  {resumeHasText && <span className="resume-status-tag">Uploaded</span>}
-                </label>
+                <label className="panel-label">Resume / CV</label>
                 <div className="profile-field">
-                  <div className="resume-upload-row">
-                    <input
-                      className="resume-upload-input"
-                      type="file"
-                      accept=".pdf"
-                      onChange={e => setResumeFile(e.target.files?.[0] ?? null)}
-                    />
+
+                  {resumeHasText && (
+                    <div className="resume-existing-info">
+                      <span className="resume-existing-ok">✓ Resume uploaded</span>
+                      {resumeCharCount > 0 && (
+                        <span className="resume-char-count">
+                          {resumeCharCount.toLocaleString()} characters extracted
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Hidden native input — triggered by the custom button */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf"
+                    className="resume-input-hidden"
+                    onChange={handleFileChange}
+                    aria-label="Choose PDF file"
+                  />
+
+                  <div className="resume-picker-row">
                     <button
-                      className="btn-upload-resume"
-                      onClick={handleResumeUpload}
-                      disabled={!resumeFile || resumeUploading}
+                      type="button"
+                      className="btn-choose-pdf"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={resumeUploading}
                     >
-                      {resumeUploading ? 'Uploading…' : 'Upload PDF'}
+                      Choose PDF
                     </button>
+                    <span className={`resume-filename${resumeFile ? '' : ' resume-filename-empty'}`}>
+                      {resumeFile
+                        ? `${resumeFile.name} — ${(resumeFile.size / 1024).toFixed(0)} KB`
+                        : 'No file selected'}
+                    </span>
                   </div>
+
+                  <button
+                    type="button"
+                    className="btn-upload-resume"
+                    onClick={handleResumeUpload}
+                    disabled={!resumeFile || resumeUploading}
+                  >
+                    {resumeUploading ? 'Uploading…' : 'Upload PDF'}
+                  </button>
+
                   {resumeMsg === 'uploaded' && (
                     <span className="resume-msg resume-msg-ok">Resume uploaded — AI analysis will use it.</span>
                   )}
                   {resumeMsg === 'error' && (
                     <span className="resume-msg resume-msg-err">Upload failed — check the backend or try a different PDF.</span>
                   )}
+
                   <span className="profile-hint">PDF only. Extracted text is sent to AI analysis as evidence of your experience.</span>
                 </div>
               </section>
