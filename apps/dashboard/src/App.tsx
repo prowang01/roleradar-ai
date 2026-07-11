@@ -126,6 +126,11 @@ export default function App() {
           onNotesChange={(id, notes) =>
             setJobs(prev => prev.map(j => j.id === id ? { ...j, notes } : j))
           }
+          onAnalyzed={(id, analysis) =>
+            setJobs(prev => prev.map(j =>
+              j.id === id ? { ...j, latest_analysis: analysis, analyzed_at: new Date().toISOString() } : j
+            ))
+          }
         />
       )}
     </div>

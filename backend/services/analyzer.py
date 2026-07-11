@@ -53,14 +53,36 @@ class BaseAnalyzer(ABC):
 
 class MockAnalyzer(BaseAnalyzer):
     def analyze(self, job_data: dict, profile_data: Optional[dict] = None) -> AnalysisResult:
-        text = " ".join([
-            job_data.get("title") or "",
-            job_data.get("description") or "",
-        ]).lower()
+        # Scan all available job text, case-insensitive
+        text = " ".join(filter(None, [
+            job_data.get("title"),
+            job_data.get("company"),
+            job_data.get("location"),
+            job_data.get("description"),
+            job_data.get("notes"),
+        ])).lower()
 
-        positive_hits = [kw for kw in POSITIVE_KEYWORDS if kw in text]
-        negative_hits = [kw for kw in NEGATIVE_KEYWORDS if kw in text]
-        senior_hits = [kw for kw in SENIOR_KEYWORDS if kw in text]
+        profile = profile_data or {}
+
+        # Build profile-aware keyword lists (normalised to lowercase)
+        profile_positive = [kw.lower() for kw in
+                            (profile.get("target_keywords") or []) +
+                            (profile.get("preferred_stacks") or [])]
+        profile_negative = [kw.lower() for kw in
+                            (profile.get("avoid_keywords") or []) +
+                            (profile.get("red_flags") or [])]
+
+        # Merge with hardcoded lists; preserve order, deduplicate
+        effective_negative = list(dict.fromkeys(NEGATIVE_KEYWORDS + profile_negative))
+        # Negative wins: any keyword that appears in the negative list is removed
+        # from the positive list so it can only score as a red flag.
+        neg_set = set(effective_negative)
+        effective_positive = [kw for kw in dict.fromkeys(POSITIVE_KEYWORDS + profile_positive)
+                              if kw not in neg_set]
+
+        positive_hits = [kw for kw in effective_positive if kw in text]
+        negative_hits = [kw for kw in effective_negative if kw in text]
+        senior_hits   = [kw for kw in SENIOR_KEYWORDS if kw in text]
 
         score = 5.0 + len(positive_hits) * 0.6 - len(negative_hits) * 2.0
         score = max(1.0, min(10.0, round(score, 1)))
@@ -80,7 +102,7 @@ class MockAnalyzer(BaseAnalyzer):
 
         has_salary = job_data.get("salary_min") or job_data.get("salary_max")
         if has_salary:
-            min_target = (profile_data or {}).get("minimum_salary_eur")
+            min_target = profile.get("minimum_salary_eur")
             job_max = job_data.get("salary_max")
             if min_target and job_max and job_max < min_target:
                 salary_signal = "below target"
@@ -162,7 +184,10 @@ class MockAnalyzer(BaseAnalyzer):
             ),
             risks=risks,
             missing_skills=["[Mock] Run with AI_PROVIDER=openai for skill gap analysis"],
-            matching_strengths=["[Mock] Run with AI_PROVIDER=openai for strength matching"],
+            matching_strengths=(
+                [f"Matches: {kw}" for kw in positive_hits[:5]]
+                or ["[Mock] Run with AI_PROVIDER=openai for strength matching"]
+            ),
             prep_topics=["Review job description in detail", "Research company recent news and culture"],
             cv_keywords_to_highlight=positive_hits[:6],
             recommended_action=(
@@ -263,6 +288,8 @@ class OpenAIAnalyzer(BaseAnalyzer):
             "DESCRIPTION:",
             job_data.get("description") or "No description provided.",
         ]
+        if job_data.get("notes"):
+            lines += ["", "USER NOTES:", job_data["notes"]]
         if profile_data:
             lines += [
                 "",

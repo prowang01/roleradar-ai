@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import type { Job, WritableStatus } from '../types'
+import type { Job, FitAnalysis, WritableStatus } from '../types'
 import { WRITABLE_STATUSES } from '../types'
 import { VerdictBadge } from './JobCard'
-import { patchJobNotes } from '../api'
+import { patchJobNotes, analyzeJob } from '../api'
 
 interface Props {
   job: Job
   onClose: () => void
   onStatusChange: (id: number, status: WritableStatus) => void
   onNotesChange: (id: number, notes: string) => void
+  onAnalyzed: (id: number, analysis: FitAnalysis) => void
 }
 
 function safeArray(val: string[] | string | null | undefined): string[] {
@@ -33,21 +34,25 @@ function BulletList({ items, emptyText }: { items: string[]; emptyText?: string 
   )
 }
 
-export default function DetailPanel({ job, onClose, onStatusChange, onNotesChange }: Props) {
-  const [descExpanded, setDescExpanded] = useState(false)
-  const [notesValue, setNotesValue] = useState(job.notes ?? '')
-  const [notesSaving, setNotesSaving] = useState(false)
-  const [notesMsg, setNotesMsg] = useState<'saved' | 'error' | null>(null)
+export default function DetailPanel({
+  job, onClose, onStatusChange, onNotesChange, onAnalyzed,
+}: Props) {
+  const [descExpanded,  setDescExpanded]  = useState(false)
+  const [notesValue,    setNotesValue]    = useState(job.notes ?? '')
+  const [notesSaving,   setNotesSaving]   = useState(false)
+  const [notesMsg,      setNotesMsg]      = useState<'saved' | 'error' | null>(null)
+  const [analyzing,     setAnalyzing]     = useState(false)
+  const [analyzeError,  setAnalyzeError]  = useState<string | null>(null)
 
   const a = job.latest_analysis
 
-  // Reset notes editor when a different job is opened
+  // Reset per-job state when a different card is opened
   useEffect(() => {
     setNotesValue(job.notes ?? '')
     setNotesMsg(null)
+    setAnalyzeError(null)
   }, [job.id])
 
-  // Escape key closes the modal
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -68,6 +73,26 @@ export default function DetailPanel({ job, onClose, onStatusChange, onNotesChang
       setNotesMsg('error')
     } finally {
       setNotesSaving(false)
+    }
+  }
+
+  async function handleAnalyze() {
+    setAnalyzing(true)
+    setAnalyzeError(null)
+    try {
+      const analysis = await analyzeJob(job.id)
+      onAnalyzed(job.id, analysis)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg === 'PROVIDER_NOT_CONFIGURED') {
+        setAnalyzeError(
+          'AI provider not configured. Check backend .env or set AI_PROVIDER=mock.'
+        )
+      } else {
+        setAnalyzeError(msg || 'Analysis failed. Check the backend is running.')
+      }
+    } finally {
+      setAnalyzing(false)
     }
   }
 
@@ -191,6 +216,16 @@ export default function DetailPanel({ job, onClose, onStatusChange, onNotesChang
                 </div>
               </div>
 
+              {/* Re-analyze */}
+              <div className="analyze-row">
+                <button className="btn-analyze" onClick={handleAnalyze} disabled={analyzing}>
+                  {analyzing ? 'Analyzing…' : 'Re-analyze job'}
+                </button>
+                {analyzeError && (
+                  <span className="analyze-error">{analyzeError}</span>
+                )}
+              </div>
+
               {a.recommended_action && (
                 <div className="analysis-action">
                   <span className="analysis-action-label">Recommended action</span>
@@ -253,7 +288,15 @@ export default function DetailPanel({ job, onClose, onStatusChange, onNotesChang
             </section>
           ) : (
             <section className="panel-section">
-              <p className="panel-empty">No analysis yet. Use the Chrome extension to analyze this role.</p>
+              <label className="panel-label">AI Analysis</label>
+              <div className="analyze-row">
+                <button className="btn-analyze" onClick={handleAnalyze} disabled={analyzing}>
+                  {analyzing ? 'Analyzing…' : 'Analyze job'}
+                </button>
+                {analyzeError && (
+                  <span className="analyze-error">{analyzeError}</span>
+                )}
+              </div>
             </section>
           )}
 

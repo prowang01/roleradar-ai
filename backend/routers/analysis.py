@@ -38,6 +38,7 @@ def analyze_job(job_id: int, db: Session = Depends(get_db)):
         "location": job.location,
         "url": job.url,
         "description": job.description,
+        "notes": job.notes,
         "role_type": job.role_type,
         "salary_min": job.salary_min,
         "salary_max": job.salary_max,

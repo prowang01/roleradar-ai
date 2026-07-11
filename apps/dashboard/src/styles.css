@@ -489,6 +489,34 @@ a:hover { text-decoration: underline; }
 .btn-save-notes:hover:not(:disabled) { background: #1e293b; }
 .btn-save-notes:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.btn-analyze {
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border: 1.5px solid #0077b5;
+  border-radius: 5px;
+  background: white;
+  color: #0077b5;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-analyze:hover:not(:disabled) { background: #eff6ff; }
+.btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.analyze-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.analyze-error {
+  font-size: 11px;
+  color: #dc2626;
+  line-height: 1.4;
+}
+
 .notes-msg { font-size: 11px; }
 .notes-msg-ok  { color: #16a34a; }
 .notes-msg-err { color: #dc2626; }
