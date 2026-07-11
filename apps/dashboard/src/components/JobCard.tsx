@@ -69,12 +69,13 @@ export default function JobCard({ job, selected, onClick, overlay = false }: Pro
 
 export function VerdictBadge({ verdict }: { verdict: Verdict }) {
   const labels: Record<Verdict, string> = {
-    strong_apply:  'Strong Apply',
-    apply:         'Apply',
-    apply_only_if: 'Apply If',
-    maybe:         'Maybe',
-    skip:          'Skip',
-    hard_skip:     'Hard Skip',
+    strong_apply:    'Strong Apply',
+    apply:           'Apply',
+    apply_as_stretch: 'Stretch Apply',
+    apply_only_if:   'Apply If',
+    maybe:           'Maybe',
+    skip:            'Skip',
+    hard_skip:       'Hard Skip',
   }
   return <span className={`verdict-badge verdict-${verdict}`}>{labels[verdict]}</span>
 }

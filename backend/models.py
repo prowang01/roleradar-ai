@@ -20,12 +20,13 @@ class JobStatus(str, enum.Enum):
 
 
 class Verdict(str, enum.Enum):
-    strong_apply = "strong_apply"
-    apply = "apply"
-    apply_only_if = "apply_only_if"
-    maybe = "maybe"
-    skip = "skip"
-    hard_skip = "hard_skip"
+    strong_apply    = "strong_apply"
+    apply           = "apply"
+    apply_as_stretch = "apply_as_stretch"
+    apply_only_if   = "apply_only_if"
+    maybe           = "maybe"
+    skip            = "skip"
+    hard_skip       = "hard_skip"
 
 
 class Job(Base):

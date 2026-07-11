@@ -12,6 +12,7 @@ export type WritableStatus = 'saved' | 'applied' | 'interview' | 'archived'
 export type Verdict =
   | 'strong_apply'
   | 'apply'
+  | 'apply_as_stretch'
   | 'apply_only_if'
   | 'maybe'
   | 'skip'

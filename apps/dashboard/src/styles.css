@@ -298,12 +298,13 @@ a:hover { text-decoration: underline; }
   border-radius: 999px;
   white-space: nowrap;
 }
-.verdict-strong_apply  { background: #dcfce7; color: #15803d; }
-.verdict-apply         { background: #dbeafe; color: #1d4ed8; }
-.verdict-apply_only_if { background: #cffafe; color: #0e7490; }
-.verdict-maybe         { background: #fef9c3; color: #a16207; }
-.verdict-skip          { background: #ffedd5; color: #c2410c; }
-.verdict-hard_skip     { background: #fee2e2; color: #b91c1c; }
+.verdict-strong_apply    { background: #dcfce7; color: #15803d; }
+.verdict-apply           { background: #dbeafe; color: #1d4ed8; }
+.verdict-apply_as_stretch { background: #eef2ff; color: #4338ca; }
+.verdict-apply_only_if   { background: #cffafe; color: #0e7490; }
+.verdict-maybe           { background: #fef9c3; color: #a16207; }
+.verdict-skip            { background: #ffedd5; color: #c2410c; }
+.verdict-hard_skip       { background: #fee2e2; color: #b91c1c; }
 
 /* ── Status badge (on card — for special statuses only) ─────────────────────── */
 .status-badge {
