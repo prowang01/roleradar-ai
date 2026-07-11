@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import type { Job, FitAnalysis, WritableStatus } from '../types'
+import type { Job, FitAnalysis, WritableStatus, JobBrief } from '../types'
 import { WRITABLE_STATUSES } from '../types'
 import { VerdictBadge } from './JobCard'
-import { patchJobNotes, analyzeJob } from '../api'
+import { patchJobNotes, analyzeJob, generateJobBrief } from '../api'
 
 interface Props {
   job: Job
@@ -10,6 +10,7 @@ interface Props {
   onStatusChange: (id: number, status: WritableStatus) => void
   onNotesChange: (id: number, notes: string) => void
   onAnalyzed: (id: number, analysis: FitAnalysis) => void
+  onBriefGenerated: (id: number, brief: JobBrief) => void
 }
 
 function safeArray(val: string[] | string | null | undefined): string[] {
@@ -34,23 +35,103 @@ function BulletList({ items, emptyText }: { items: string[]; emptyText?: string 
   )
 }
 
+function BriefView({ brief }: { brief: JobBrief }) {
+  const hasSalary = brief.salary_location_remote && brief.salary_location_remote !== 'Not mentioned.'
+  const hasCompanyCtx = brief.company_context && brief.company_context !== 'Not mentioned.'
+  const hasTeamCtx = brief.team_context && brief.team_context !== 'Not mentioned.'
+
+  return (
+    <div className="brief-body">
+      {brief.role_summary && (
+        <p className="brief-role-summary">{brief.role_summary}</p>
+      )}
+
+      {hasSalary && (
+        <div className="brief-pill-row">
+          <span className="brief-pill">{brief.salary_location_remote}</span>
+        </div>
+      )}
+
+      {brief.responsibilities.length > 0 && (
+        <div className="brief-block">
+          <span className="brief-block-label">Responsibilities</span>
+          <BulletList items={brief.responsibilities} />
+        </div>
+      )}
+
+      {brief.requirements.length > 0 && (
+        <div className="brief-block">
+          <span className="brief-block-label">Requirements</span>
+          <BulletList items={brief.requirements} />
+        </div>
+      )}
+
+      {brief.nice_to_have.length > 0 && (
+        <div className="brief-block">
+          <span className="brief-block-label">Nice to have</span>
+          <BulletList items={brief.nice_to_have} />
+        </div>
+      )}
+
+      {brief.seniority_signals.length > 0 && (
+        <div className="brief-block">
+          <span className="brief-block-label">Seniority signals</span>
+          <BulletList items={brief.seniority_signals} />
+        </div>
+      )}
+
+      {brief.benefits.length > 0 && (
+        <div className="brief-block">
+          <span className="brief-block-label">Benefits</span>
+          <BulletList items={brief.benefits} />
+        </div>
+      )}
+
+      {(hasCompanyCtx || hasTeamCtx) && (
+        <div className="brief-block">
+          <span className="brief-block-label">Context</span>
+          {hasCompanyCtx && <p className="brief-context-text">{brief.company_context}</p>}
+          {hasTeamCtx && <p className="brief-context-text">{brief.team_context}</p>}
+        </div>
+      )}
+
+      {brief.potential_red_flags.length > 0 && (
+        <div className="brief-block brief-flags">
+          <span className="brief-block-label brief-flags-label">Potential red flags</span>
+          <BulletList items={brief.potential_red_flags} />
+        </div>
+      )}
+
+      {brief.missing_information.length > 0 && (
+        <div className="brief-block brief-missing">
+          <span className="brief-block-label">Missing information</span>
+          <BulletList items={brief.missing_information} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DetailPanel({
-  job, onClose, onStatusChange, onNotesChange, onAnalyzed,
+  job, onClose, onStatusChange, onNotesChange, onAnalyzed, onBriefGenerated,
 }: Props) {
-  const [descExpanded,  setDescExpanded]  = useState(false)
-  const [notesValue,    setNotesValue]    = useState(job.notes ?? '')
-  const [notesSaving,   setNotesSaving]   = useState(false)
-  const [notesMsg,      setNotesMsg]      = useState<'saved' | 'error' | null>(null)
-  const [analyzing,     setAnalyzing]     = useState(false)
-  const [analyzeError,  setAnalyzeError]  = useState<string | null>(null)
+  const [notesValue,   setNotesValue]   = useState(job.notes ?? '')
+  const [notesSaving,  setNotesSaving]  = useState(false)
+  const [notesMsg,     setNotesMsg]     = useState<'saved' | 'error' | null>(null)
+  const [analyzing,    setAnalyzing]    = useState(false)
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
+  const [briefing,     setBriefing]     = useState(false)
+  const [briefError,   setBriefError]   = useState<string | null>(null)
+  const [rawExpanded,  setRawExpanded]  = useState(false)
 
   const a = job.latest_analysis
 
-  // Reset per-job state when a different card is opened
   useEffect(() => {
     setNotesValue(job.notes ?? '')
     setNotesMsg(null)
     setAnalyzeError(null)
+    setBriefError(null)
+    setRawExpanded(false)
   }, [job.id])
 
   useEffect(() => {
@@ -85,9 +166,7 @@ export default function DetailPanel({
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
       if (msg === 'PROVIDER_NOT_CONFIGURED') {
-        setAnalyzeError(
-          'AI provider not configured. Check backend .env or set AI_PROVIDER=mock.'
-        )
+        setAnalyzeError('AI provider not configured. Check backend .env or set AI_PROVIDER=mock.')
       } else {
         setAnalyzeError(msg || 'Analysis failed. Check the backend is running.')
       }
@@ -96,9 +175,27 @@ export default function DetailPanel({
     }
   }
 
+  async function handleGenerateBrief() {
+    setBriefing(true)
+    setBriefError(null)
+    try {
+      const brief = await generateJobBrief(job.id)
+      onBriefGenerated(job.id, brief)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg === 'PROVIDER_NOT_CONFIGURED') {
+        setBriefError('OpenAI key not configured. Add OPENAI_API_KEY to backend .env.')
+      } else {
+        setBriefError(msg || 'Brief generation failed. Check the backend is running.')
+      }
+    } finally {
+      setBriefing(false)
+    }
+  }
+
   const PREVIEW_LEN = 400
   const desc = job.description ?? ''
-  const descTruncated = desc.length > PREVIEW_LEN && !descExpanded
+  const brief = job.job_brief_json
 
   const pros          = safeArray(a?.pros_json)
   const cons          = safeArray(a?.cons_json)
@@ -157,25 +254,62 @@ export default function DetailPanel({
             </select>
           </section>
 
-          {/* Description */}
-          {desc && (
-            <section className="panel-section">
-              <label className="panel-label">Description</label>
-              <p className="panel-desc">
-                {descTruncated ? desc.slice(0, PREVIEW_LEN) + '…' : desc}
-              </p>
-              {desc.length > PREVIEW_LEN && (
-                <button
-                  className="panel-toggle"
-                  onClick={() => setDescExpanded(x => !x)}
-                >
-                  {descExpanded ? 'Show less' : 'Show full description'}
-                </button>
-              )}
-            </section>
-          )}
+          {/* Description / Brief */}
+          <section className="panel-section">
+            <div className="brief-header-row">
+              <label className="panel-label">
+                {brief ? 'Job Brief' : 'Description'}
+              </label>
+              <button
+                className="btn-brief"
+                onClick={handleGenerateBrief}
+                disabled={briefing || !desc}
+                title={!desc ? 'No description available' : undefined}
+              >
+                {briefing
+                  ? (brief ? 'Regenerating…' : 'Generating…')
+                  : (brief ? 'Regenerate brief' : 'Generate job brief')}
+              </button>
+            </div>
 
-          {/* Notes — always editable */}
+            {briefError && <p className="brief-error">{briefError}</p>}
+
+            {brief ? (
+              <>
+                <BriefView brief={brief} />
+                {desc && (
+                  <details
+                    className="raw-desc-details"
+                    open={rawExpanded}
+                    onToggle={e => setRawExpanded((e.target as HTMLDetailsElement).open)}
+                  >
+                    <summary className="raw-desc-summary">Raw LinkedIn description</summary>
+                    <p className="panel-desc raw-desc-text">{desc}</p>
+                  </details>
+                )}
+              </>
+            ) : desc ? (
+              <>
+                <p className="panel-desc">
+                  {desc.length > PREVIEW_LEN && !rawExpanded
+                    ? desc.slice(0, PREVIEW_LEN) + '…'
+                    : desc}
+                </p>
+                {desc.length > PREVIEW_LEN && (
+                  <button
+                    className="panel-toggle"
+                    onClick={() => setRawExpanded(x => !x)}
+                  >
+                    {rawExpanded ? 'Show less' : 'Show full description'}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="panel-empty">No description available.</p>
+            )}
+          </section>
+
+          {/* Notes */}
           <section className="panel-section">
             <label className="panel-label">Notes</label>
             <textarea
@@ -216,7 +350,6 @@ export default function DetailPanel({
                 </div>
               </div>
 
-              {/* Re-analyze */}
               <div className="analyze-row">
                 <button className="btn-analyze" onClick={handleAnalyze} disabled={analyzing}>
                   {analyzing ? 'Analyzing…' : 'Re-analyze job'}

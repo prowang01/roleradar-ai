@@ -131,6 +131,11 @@ export default function App() {
               j.id === id ? { ...j, latest_analysis: analysis, analyzed_at: new Date().toISOString() } : j
             ))
           }
+          onBriefGenerated={(id, brief) =>
+            setJobs(prev => prev.map(j =>
+              j.id === id ? { ...j, job_brief_json: brief } : j
+            ))
+          }
         />
       )}
     </div>

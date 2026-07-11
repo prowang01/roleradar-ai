@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.models import Job, FitAnalysis, UserProfile, Verdict
-from backend.schemas import FitAnalysisResponse
+from backend.schemas import FitAnalysisResponse, JobBriefResponse
 from backend.services.analyzer import get_analyzer
+from backend.services.briefer import BriefService
 
 router = APIRouter(prefix="/jobs", tags=["analysis"])
 
@@ -43,6 +44,7 @@ def analyze_job(job_id: int, db: Session = Depends(get_db)):
         "role_type": job.role_type,
         "salary_min": job.salary_min,
         "salary_max": job.salary_max,
+        "job_brief": job.job_brief_json,
     }
 
     try:
@@ -80,3 +82,24 @@ def analyze_job(job_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(analysis)
     return analysis
+
+
+@router.post("/{job_id}/brief", response_model=JobBriefResponse)
+def generate_brief(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not job.description:
+        raise HTTPException(status_code=400, detail="Job has no description to generate a brief from.")
+
+    try:
+        brief = BriefService().generate(job.title, job.company, job.location, job.description)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Brief generation failed: {exc}")
+
+    job.job_brief_json = brief
+    db.commit()
+    return brief

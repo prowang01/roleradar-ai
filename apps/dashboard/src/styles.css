@@ -722,3 +722,117 @@ a:hover { text-decoration: underline; }
 }
 .resume-msg-ok  { color: #16a34a; }
 .resume-msg-err { color: #dc2626; }
+
+/* Job Brief */
+.brief-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.brief-header-row .panel-label {
+  margin-bottom: 0;
+}
+.btn-brief {
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-brief:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.brief-error {
+  font-size: 11.5px;
+  color: #dc2626;
+  margin-bottom: 6px;
+  display: block;
+}
+.brief-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.brief-role-summary {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #1e293b;
+}
+.brief-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.brief-pill {
+  font-size: 11.5px;
+  font-weight: 500;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+.brief-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.brief-block-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #94a3b8;
+}
+.brief-context-text {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #475569;
+}
+.brief-flags .brief-block-label,
+.brief-flags-label {
+  color: #b91c1c;
+}
+.brief-flags .panel-list li {
+  color: #b91c1c;
+}
+.brief-missing .brief-block-label {
+  color: #92400e;
+}
+.brief-missing .panel-list li {
+  color: #78350f;
+}
+.raw-desc-details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+.raw-desc-summary {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.raw-desc-summary::-webkit-details-marker { display: none; }
+.raw-desc-summary::before {
+  content: '▶ ';
+  font-size: 9px;
+}
+details[open] .raw-desc-summary::before {
+  content: '▼ ';
+}
+.raw-desc-text {
+  margin-top: 8px;
+  color: #94a3b8;
+  white-space: pre-wrap;
+}

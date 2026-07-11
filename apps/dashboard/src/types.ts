@@ -42,6 +42,20 @@ export interface FitAnalysis {
   created_at: string
 }
 
+export interface JobBrief {
+  company_context: string
+  team_context: string
+  role_summary: string
+  responsibilities: string[]
+  requirements: string[]
+  nice_to_have: string[]
+  benefits: string[]
+  seniority_signals: string[]
+  salary_location_remote: string
+  missing_information: string[]
+  potential_red_flags: string[]
+}
+
 export interface Job {
   id: number
   source: string
@@ -59,6 +73,7 @@ export interface Job {
   role_type: string | null
   salary_min: number | null
   salary_max: number | null
+  job_brief_json: JobBrief | null
   created_at: string
   updated_at: string
   latest_analysis: FitAnalysis | null

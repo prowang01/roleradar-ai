@@ -1,4 +1,4 @@
-import type { Job, WritableStatus, UserProfile, UserProfileUpdate, FitAnalysis } from './types'
+import type { Job, WritableStatus, UserProfile, UserProfileUpdate, FitAnalysis, JobBrief } from './types'
 
 const API = 'http://localhost:8000'
 
@@ -51,6 +51,16 @@ export async function updateProfile(data: UserProfileUpdate): Promise<UserProfil
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(`PUT /profile failed: ${res.status}`)
+  return res.json()
+}
+
+export async function generateJobBrief(jobId: number): Promise<JobBrief> {
+  const res = await fetch(`${API}/jobs/${jobId}/brief`, { method: 'POST' })
+  if (!res.ok) {
+    if (res.status === 400) throw new Error('PROVIDER_NOT_CONFIGURED')
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.detail ?? `POST /jobs/${jobId}/brief failed: ${res.status}`)
+  }
   return res.json()
 }
 

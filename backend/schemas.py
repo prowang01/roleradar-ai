@@ -79,6 +79,7 @@ class JobResponse(BaseModel):
     role_type: Optional[str] = None
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
+    job_brief_json: Optional[dict] = None
     created_at: datetime
     updated_at: datetime
 
@@ -90,6 +91,20 @@ class JobDetailResponse(JobResponse):
 class JobLookupResponse(BaseModel):
     found: bool
     job: Optional[JobDetailResponse] = None
+
+
+class JobBriefResponse(BaseModel):
+    company_context: str = ""
+    team_context: str = ""
+    role_summary: str = ""
+    responsibilities: List[str] = []
+    requirements: List[str] = []
+    nice_to_have: List[str] = []
+    benefits: List[str] = []
+    seniority_signals: List[str] = []
+    salary_location_remote: str = ""
+    missing_information: List[str] = []
+    potential_red_flags: List[str] = []
 
 
 class UserProfileUpdate(BaseModel):

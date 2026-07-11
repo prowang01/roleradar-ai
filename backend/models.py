@@ -48,6 +48,7 @@ class Job(Base):
     role_type = Column(String, nullable=True)
     salary_min = Column(Integer, nullable=True)
     salary_max = Column(Integer, nullable=True)
+    job_brief_json = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_now, onupdate=_now)
 

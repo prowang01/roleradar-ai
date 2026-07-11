@@ -458,6 +458,25 @@ class OpenAIAnalyzer(BaseAnalyzer):
         ]
         if job_data.get("notes"):
             lines += ["", "USER NOTES:", job_data["notes"]]
+        if job_data.get("job_brief"):
+            brief = job_data["job_brief"]
+            brief_lines = ["", "STRUCTURED JOB BRIEF (AI-extracted, noise-removed):"]
+            if brief.get("role_summary"):
+                brief_lines.append(f"  Role summary: {brief['role_summary']}")
+            if brief.get("seniority_signals"):
+                brief_lines.append(f"  Seniority signals: {'; '.join(brief['seniority_signals'])}")
+            if brief.get("requirements"):
+                brief_lines.append(f"  Requirements: {'; '.join(brief['requirements'])}")
+            if brief.get("responsibilities"):
+                brief_lines.append(f"  Responsibilities: {'; '.join(brief['responsibilities'][:5])}")
+            if brief.get("nice_to_have"):
+                brief_lines.append(f"  Nice to have: {'; '.join(brief['nice_to_have'])}")
+            slr = brief.get("salary_location_remote", "")
+            if slr and slr != "Not mentioned.":
+                brief_lines.append(f"  Salary/location: {slr}")
+            if brief.get("potential_red_flags"):
+                brief_lines.append(f"  Red flags: {'; '.join(brief['potential_red_flags'])}")
+            lines += brief_lines
         if profile_data:
             lines += [
                 "",

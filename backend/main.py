@@ -12,9 +12,14 @@ from backend.routers import jobs, analysis, profile
 
 def _run_migrations() -> None:
     with engine.connect() as conn:
-        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(user_profiles)"))}
-        if "resume_text" not in cols:
+        profile_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(user_profiles)"))}
+        if "resume_text" not in profile_cols:
             conn.execute(text("ALTER TABLE user_profiles ADD COLUMN resume_text TEXT"))
+            conn.commit()
+
+        job_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(jobs)"))}
+        if "job_brief_json" not in job_cols:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN job_brief_json TEXT"))
             conn.commit()
 
 
