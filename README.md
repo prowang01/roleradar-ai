@@ -28,7 +28,7 @@ Current milestone: **Dashboard MVP** — Kanban pipeline view, job detail panel,
 
 ## Local setup
 
-**Requirements:** Python 3.10+
+**Requirements:** Python 3.10+, Node.js 18+
 
 ```bash
 # 1. Clone the repo
@@ -40,10 +40,14 @@ python -m venv .venv
 source .venv/bin/activate      # macOS/Linux
 # .venv\Scripts\activate       # Windows
 
-# 3. Install dependencies
+# 3. Install Python dependencies
 pip install -r requirements.txt
 
-# 4. Configure environment
+# 4. Install Node dependencies (root + dashboard)
+npm install
+npm --prefix apps/dashboard install
+
+# 5. Configure environment
 cp .env.example .env
 # Edit .env if needed — defaults work out of the box with MockAnalyzer
 ```
@@ -52,17 +56,23 @@ The SQLite database (`roleradar.db`) is created automatically on first run.
 
 ---
 
-## Running the API
+## Running locally (one command)
 
-Always run from the **project root** (where `.env` lives):
+> **Note:** Activate your Python venv first (`source .venv/bin/activate`).
 
 ```bash
-uvicorn backend.main:app --reload
+npm run dev
 ```
 
-The API is available at `http://localhost:8000`.
+This starts both services concurrently:
 
-Interactive docs (Swagger UI): `http://localhost:8000/docs`
+| Service | URL |
+|---------|-----|
+| FastAPI backend | http://localhost:8000 |
+| React dashboard | http://localhost:5173 |
+| Swagger UI | http://localhost:8000/docs |
+
+To stop both, press `Ctrl+C`.
 
 ---
 
@@ -190,20 +200,6 @@ If `AI_PROVIDER=openai` but `OPENAI_API_KEY` is missing, the `/analyze` endpoint
 
 ---
 
-## Running the dashboard
-
-Requires Node.js 18+. The FastAPI backend must be running first.
-
-```bash
-cd apps/dashboard
-npm install
-npm run dev
-```
-
-Dashboard is available at **http://localhost:5173**
-
----
-
 ## Project structure
 
 ```
@@ -235,6 +231,7 @@ roleradar-ai/
 │       │       └── StatsRow.tsx
 │       └── package.json
 ├── extension/                # Chrome extension (MV3)
+├── package.json              # Root: npm run dev starts both services
 ├── requirements.txt
 ├── .env.example
 └── README.md

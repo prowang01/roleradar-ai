@@ -1,0 +1,11 @@
+{
+  "name": "roleradar-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"API,DASHBOARD\" --prefix-colors \"bgBlue.bold,bgGreen.bold\" \"uvicorn backend.main:app --reload\" \"npm --prefix apps/dashboard run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
