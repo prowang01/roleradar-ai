@@ -31,13 +31,13 @@ export interface FitAnalysis {
   learning_upside: string | null
   technical_depth: string | null
   why: string | null
-  pros_json: string[] | string
-  cons_json: string[] | string
-  risks_json: string[] | string
-  missing_skills_json: string[] | string
-  matching_strengths_json: string[] | string
-  prep_topics_json: string[] | string
-  cv_keywords_to_highlight_json: string[] | string
+  pros_json: string[]
+  cons_json: string[]
+  risks_json: string[]
+  missing_skills_json: string[]
+  matching_strengths_json: string[]
+  prep_topics_json: string[]
+  cv_keywords_to_highlight_json: string[]
   recommended_action: string | null
   created_at: string
 }

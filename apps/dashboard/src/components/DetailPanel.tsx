@@ -13,15 +13,8 @@ interface Props {
   onBriefGenerated: (id: number, brief: JobBrief) => void
 }
 
-function safeArray(val: string[] | string | null | undefined): string[] {
-  if (!val) return []
-  if (Array.isArray(val)) return val
-  try {
-    const parsed = JSON.parse(val)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
+function safeArray(val: string[] | null | undefined): string[] {
+  return val ?? []
 }
 
 function BulletList({ items, emptyText }: { items: string[]; emptyText?: string }) {
