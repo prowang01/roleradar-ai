@@ -473,6 +473,17 @@ async function ensureJob(status = 'saved') {
   return job;
 }
 
+async function patchDescription(jobId, description) {
+  console.log('[RoleRadar] PATCH /jobs/' + jobId, { description: description?.slice(0, 60) + '…' });
+  const res = await fetch(`${API}/jobs/${jobId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  });
+  if (!res.ok) throw new Error(`PATCH /jobs/${jobId} failed (${res.status})`);
+  return res.json();
+}
+
 async function patchStatus(jobId, status) {
   console.log('[RoleRadar] PATCH /jobs/' + jobId, { status });
   const res = await fetch(`${API}/jobs/${jobId}`, {
@@ -648,10 +659,18 @@ async function onSave() {
   setActionButtons(false);
   setActionMsg('loading', 'Saving…');
   try {
-    const job = await ensureJob('saved');
+    let job;
+    if (state.backendJob?.id) {
+      // Job already exists — update description with freshly extracted text
+      const { description } = getFields();
+      job = await patchDescription(state.backendJob.id, description);
+      setActionMsg('success', `Updated (ID: ${job.id})`);
+    } else {
+      job = await ensureJob('saved');
+      setActionMsg('success', `Saved (ID: ${job.id})`);
+    }
     state.backendJob = { ...(state.backendJob || {}), ...job };
     refreshBadge();
-    setActionMsg('success', `Saved (ID: ${job.id})`);
   } catch (e) {
     setActionMsg('error', e.message);
   } finally {
