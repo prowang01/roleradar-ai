@@ -15,6 +15,8 @@ Job search gets messy fast: duplicate applications, lost context, unclear priori
 A Chrome extension captures LinkedIn jobs in one click. A FastAPI backend stores and deduplicates them. A React dashboard tracks the pipeline. An AI analyzer evaluates each role against your profile and resume — and tells you honestly whether it's worth applying.
 
 ---
+## Demo
+<video src="docs/videos/demo.mp4" controls width="100%"></video>
 
 ## Screenshots
 
