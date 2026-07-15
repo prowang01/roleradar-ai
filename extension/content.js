@@ -82,6 +82,8 @@ const DESC_END_MARKERS = [
   "Découvrez comment vous vous positionnez",
   "Accédez à des informations exclusives",
   "Accédez à des informations exclusives",
+  "Accéder aux données de recrutement",
+  "Niveau de formation des candidats",
   "Essayer Premium",
   // French — LinkedIn-generated sections
   "À propos de l’entreprise",
@@ -107,6 +109,14 @@ const DESC_END_MARKERS = [
   "Meet the hiring team",
   "More jobs",
   "Learn more about the company",
+];
+
+// Premium insight card markers — blocks starting with these are the premium card,
+// not the job description. Used in the fallback to skip them entirely.
+const PREMIUM_BLOCK_MARKERS = [
+  "Accéder aux données de recrutement",
+  "Niveau de formation des candidats",
+  "Essayer Premium",
 ];
 
 // Standalone UI fragments to strip from extracted description text.
@@ -450,7 +460,7 @@ function extractDescription() {
     }
   }
 
-  // 4. Largest text block inside known detail panels (last resort — no end-marker slicing)
+  // 4. Largest text block inside known detail panels (last resort)
   let bestText = '', bestLen = 0;
   for (const panelSel of DETAIL_PANEL_SELECTORS) {
     const panel = document.querySelector(panelSel);
@@ -459,6 +469,7 @@ function extractDescription() {
       if (el.children.length > 6) continue;
       const text = (el.innerText || '').trim();
       if (text.length > bestLen && text.length > 200 && text.length < 20000) {
+        if (PREMIUM_BLOCK_MARKERS.some(m => text.startsWith(m))) continue;
         bestLen = text.length;
         bestText = text;
       }
@@ -468,9 +479,11 @@ function extractDescription() {
   if (bestText) {
     const { sliced, endMarker } = sliceByEndMarkers(bestText);
     const clean = cleanDescription(sliced);
-    console.log('[RoleRadar:content] Description from panel-largest, cleanLen:', clean.length);
-    return { value: clean.slice(0, 10000), source: 'panel-largest',
-             startMarker: null, endMarker, rawLength: bestText.length, cleanLength: clean.length };
+    if (clean.length > 50) {
+      console.log('[RoleRadar:content] Description from panel-largest, cleanLen:', clean.length);
+      return { value: clean.slice(0, 10000), source: 'panel-largest',
+               startMarker: null, endMarker, rawLength: bestText.length, cleanLength: clean.length };
+    }
   }
 
   return { value: null, source: null, startMarker: null, endMarker: null, rawLength: null, cleanLength: null };
