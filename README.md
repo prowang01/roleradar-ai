@@ -16,8 +16,7 @@ A Chrome extension captures LinkedIn jobs in one click. A FastAPI backend stores
 
 ---
 ## Demo
-<video src="docs/videos/demo.mp4" controls width="100%"></video>
-
+[Watch the demo video](docs/videos/demo.mp4)
 ## Screenshots
 
 | Dashboard | Job analysis | Chrome extension |
