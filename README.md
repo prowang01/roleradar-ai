@@ -148,18 +148,26 @@ Note: brief generation always requires OpenAI. The mock analyzer covers fit scor
 
 ## Project status
 
-Local-first V1. Works end-to-end: extension → backend → dashboard → AI analysis.
-Not deployed — intentionally local-first by design.
+RoleRadar AI is currently a local-first V1 portfolio project.
+
+The main workflow is implemented end-to-end:
+- Chrome extension captures LinkedIn job postings
+- FastAPI backend stores jobs locally
+- React dashboard tracks application status
+- User can upload a resume and edit a career profile
+- AI generates structured job briefs
+- AI produces profile-aware role-fit analysis
+
+This is not deployed as a public SaaS product. It is designed as a local-first personal tool and portfolio project.
 
 ---
 
-## Roadmap
+## Future improvements
 
-- Smoke tests and CI
-- Prompt versioning and evals
-- Docker Compose for one-command setup
-- Floating applied-status widget in the extension
-- AI-guided profile builder
+- Smoke tests for the backend API
+- Prompt evaluation cases for the scoring rubric
+- Configurable backend URL for the extension
+- Docker Compose for local setup
 
 ---
 
