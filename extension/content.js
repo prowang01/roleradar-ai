@@ -65,7 +65,7 @@ const DETAIL_PANEL_SELECTORS = [
 // Strict start markers — only genuine "About the job" headings.
 const DESC_START_MARKERS = [
   "À propos de l’offre d’emploi",  // typographic apostrophes (U+2019)
-  "À propos de l’offre d’emploi",             // straight apostrophes
+  "À propos de l'offre d'emploi",  // straight apostrophes
   "About the job",
   "About this job",
 ];
@@ -77,27 +77,25 @@ const DESC_START_MARKERS = [
 const DESC_END_MARKERS = [
   // French — LinkedIn Premium upsell
   "Des recherches d’emploi plus rapides",   // typographic apostrophe
-  "Des recherches d’emploi plus rapides",   // straight apostrophe
+  "Des recherches d'emploi plus rapides",   // straight apostrophe
   "Découvrez comment vous vous positionnez",
-  "Découvrez comment vous vous positionnez",
-  "Accédez à des informations exclusives",
   "Accédez à des informations exclusives",
   "Accéder aux données de recrutement",
   "Niveau de formation des candidats",
   "Essayer Premium",
   // French — LinkedIn-generated sections
-  "À propos de l’entreprise",
+  "À propos de l'entreprise",
   "À propos de l’entreprise",
   "Personnes que vous pouvez contacter",
-  "Rencontrez l’équipe",
+  "Rencontrez l'équipe",
   "Rencontrez l’équipe",
   "Rencontrez l’equipe",
+  "Voir plus d'offres",
   "Voir plus d’offres",
-  "Voir plus d’offres",
-  "En savoir plus sur l’entreprise",
+  "En savoir plus sur l'entreprise",
   "En savoir plus sur l’entreprise",
   // French — LinkedIn-generated benefits block (never author-written)
-  "Avantages trouvés dans l’offre d’emploi",
+  "Avantages trouvés dans l'offre d'emploi",
   "Avantages trouvés dans l’offre d’emploi",
   // English — LinkedIn Premium upsell
   "Faster job searches",
@@ -344,12 +342,8 @@ function cleanDescription(raw) {
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')                 // collapse excess blank lines
     .replace(/^[ \t]+|[ \t]+$/gm, '')            // trim each line's leading/trailing spaces
-    .replace(DESC_NOISE_LINES_RE, '')             // nuke standalone UI fragments (single line)
     .split('\n')
-    .filter((line, i, arr) => {                  // remove redundant noise lines
-      if (!DESC_NOISE_LINES_RE.test(line.trim())) return true;
-      return false;
-    })
+    .filter(line => !DESC_NOISE_LINES_RE.test(line.trim()))
     .join('\n');
   text = text.replace(/\n{3,}/g, '\n\n').trim();
   text = text.replace(DESC_TRAILING_PLUS_RE, '').trim();

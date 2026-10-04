@@ -177,7 +177,7 @@ export default function DetailPanel({
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
       if (msg === 'PROVIDER_NOT_CONFIGURED') {
-        setBriefError('OpenAI key not configured. Add OPENAI_API_KEY to backend .env.')
+        setBriefError('OpenAI key not configured. Add OPENAI_API_KEY to the root .env.')
       } else {
         setBriefError(msg || 'Brief generation failed. Check the backend is running.')
       }
@@ -199,7 +199,7 @@ export default function DetailPanel({
   const currentWritable = (['saved', 'applied', 'interview', 'archived'] as WritableStatus[])
     .includes(job.status as WritableStatus)
     ? job.status as WritableStatus
-    : 'archived'
+    : job.status === 'oa' || job.status === 'offer' ? 'interview' : 'archived'
 
   return (
     <div className="modal-overlay" onClick={onClose}>

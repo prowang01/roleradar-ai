@@ -104,7 +104,7 @@ export default function ProfileModal({ onClose }: Props) {
   const [resumeHasText,   setResumeHasText]   = useState(false)
   const [resumeCharCount, setResumeCharCount] = useState(0)
   const [resumeUploading, setResumeUploading] = useState(false)
-  const [resumeMsg,       setResumeMsg]       = useState<'uploaded' | 'error' | null>(null)
+  const [resumeMsg,       setResumeMsg]       = useState<'uploaded' | 'empty' | 'error' | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -145,11 +145,11 @@ export default function ProfileModal({ onClose }: Props) {
     setResumeMsg(null)
     try {
       const updated = await uploadResume(resumeFile)
-      setResumeHasText(true)
+      setResumeHasText(Boolean(updated.resume_text))
       setResumeCharCount(updated.resume_text?.length ?? 0)
       setResumeFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
-      setResumeMsg('uploaded')
+      setResumeMsg(updated.resume_text ? 'uploaded' : 'empty')
       setTimeout(() => setResumeMsg(null), 3000)
     } catch {
       setResumeMsg('error')
@@ -260,8 +260,11 @@ export default function ProfileModal({ onClose }: Props) {
                   {resumeMsg === 'error' && (
                     <span className="resume-msg resume-msg-err">Upload failed — check the backend or try a different PDF.</span>
                   )}
+                  {resumeMsg === 'empty' && (
+                    <span className="resume-msg resume-msg-err">No resume text extracted. Try a PDF with selectable text; previous resume context was replaced.</span>
+                  )}
 
-                  <span className="profile-hint">PDF only. Extracted text is sent to AI analysis as evidence of your experience.</span>
+                  <span className="profile-hint">PDF with selectable text only. Extracted text is stored locally and sent to OpenAI when you run OpenAI fit analysis.</span>
                 </div>
               </section>
 

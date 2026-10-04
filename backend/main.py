@@ -37,7 +37,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow requests from the Chrome extension and a future local dashboard.
+# Allow requests from the Chrome extension and the local dashboard.
 # local dev only — tighten allow_origins before any deployment.
 app.add_middleware(
     CORSMiddleware,
